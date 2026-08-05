@@ -2,7 +2,15 @@ import { Billboard, Instance, Instances, Text } from '@react-three/drei'
 import { edgeColor, nodeColor, type World } from '@redux-xvr/layout'
 import { useMemo } from 'react'
 import { BufferAttribute, BufferGeometry, Color } from 'three'
+import { elementHandlers, type Intents } from '../interaction.js'
 import { FONT_URL } from './typography.js'
+
+export interface WorldViewProps {
+  world: World
+  intents?: Intents
+  /** Ids to light up — the current correspondence partners. */
+  highlight?: Set<string>
+}
 
 const VERTEX_RADIUS = 0.17
 const SOLUTION_SCALE = 1.45
@@ -62,19 +70,21 @@ function Edges({ world }: { world: World }) {
 }
 
 /** Instanced so vertex count stays one draw call as instances grow. */
-function Vertices({ world }: { world: World }) {
+function Vertices({ world, intents, highlight }: WorldViewProps) {
   return (
     <Instances limit={Math.max(world.nodes.length, 1)} castShadow={false}>
       <sphereGeometry args={[VERTEX_RADIUS, 24, 16]} />
       <meshStandardMaterial roughness={0.4} metalness={0.05} />
       {world.nodes.map((node) => {
         const solved = node.color === 'Solution'
+        const lit = highlight?.has(node.id) ?? false
         return (
           <Instance
             key={node.id}
             position={node.position as unknown as [number, number, number]}
-            color={nodeColor(node.color)}
-            scale={solved ? SOLUTION_SCALE : 1}
+            color={lit ? '#ffffff' : nodeColor(node.color)}
+            scale={(solved ? SOLUTION_SCALE : 1) * (lit ? 1.5 : 1)}
+            {...(intents ? elementHandlers(node.id, intents) : {})}
           />
         )
       })}
@@ -83,7 +93,7 @@ function Vertices({ world }: { world: World }) {
 }
 
 /** Billboarded so labels stay readable from any angle, including in a headset. */
-function Labels({ world }: { world: World }) {
+function Labels({ world, highlight }: WorldViewProps) {
   return (
     <>
       {world.nodes.map((node) => (
@@ -94,7 +104,13 @@ function Labels({ world }: { world: World }) {
           <Text
             font={FONT_URL}
             fontSize={LABEL_SIZE}
-            color={node.color === 'Solution' ? '#eafff2' : '#c6d2e2'}
+            color={
+              highlight?.has(node.id)
+                ? '#ffffff'
+                : node.color === 'Solution'
+                  ? '#eafff2'
+                  : '#c6d2e2'
+            }
             anchorX="center"
             anchorY="middle"
             outlineWidth={0.016}
@@ -164,13 +180,13 @@ function GroupHulls({ world }: { world: World }) {
   )
 }
 
-export function GraphWorld({ world }: { world: World }) {
+export function GraphWorld({ world, intents, highlight }: WorldViewProps) {
   return (
     <group position={world.origin as unknown as [number, number, number]} scale={world.scale}>
       <GroupHulls world={world} />
       <Edges world={world} />
-      <Vertices world={world} />
-      <Labels world={world} />
+      <Vertices world={world} intents={intents} highlight={highlight} />
+      <Labels world={world} highlight={highlight} />
     </group>
   )
 }

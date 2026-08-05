@@ -1,8 +1,19 @@
 import { Billboard, OrbitControls, Text } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { buildScene, type SceneGraph, type World } from '@redux-xvr/layout'
-import { useEffect, useState } from 'react'
+import {
+  buildScene,
+  certificateSegments,
+  edgeColor,
+  type LinkSegment,
+  relatedIds,
+  resolveLinks,
+  type SceneGraph,
+  type World,
+} from '@redux-xvr/layout'
+import { useEffect, useMemo, useState } from 'react'
 import { BASE_URL, DEMO_INSTANCE, fetchBundle, fixtureBundle } from './api/redux.js'
+import { activeElement, useIntents } from './interaction.js'
+import { Correspondences, type LinkDirection } from './scene/Correspondences.js'
 import { FormulaWorld } from './scene/FormulaWorld.js'
 import { GraphWorld } from './scene/GraphWorld.js'
 import { FONT_URL } from './scene/typography.js'
@@ -12,6 +23,33 @@ const STATIC = params.get('static') === '1'
 const USE_FIXTURES = params.get('source') === 'fixtures'
 const FRAME = params.get('frame')
 const WORLD = params.get('world') ?? 'both'
+const FOCUS = params.get('focus')
+
+/** Mirrors the switches Redux_GUI already exposes, plus the backward direction. */
+const MODES = {
+  reduction: {
+    label: 'Show reduction',
+    hint: 'each clause becomes a cluster of vertices',
+    direction: 'forward' as LinkDirection,
+  },
+  gadgets: {
+    label: 'Highlight gadgets',
+    hint: 'each literal becomes exactly one vertex',
+    direction: 'forward' as LinkDirection,
+  },
+  solution: {
+    label: 'Map certificate',
+    hint: 'the k-clique maps back to a satisfying assignment',
+    direction: 'backward' as LinkDirection,
+  },
+} as const
+
+type Mode = keyof typeof MODES
+
+const INITIAL_MODE: Mode = (() => {
+  const m = params.get('mode')
+  return m && m in MODES ? (m as Mode) : 'reduction'
+})()
 
 declare global {
   interface Window {
@@ -144,8 +182,16 @@ function WorldTitle({ world }: { world: World }) {
   )
 }
 
+function segmentsForMode(all: LinkSegment[], mode: Mode): LinkSegment[] {
+  if (mode === 'solution') return certificateSegments(all)
+  if (mode === 'gadgets') return all.filter((s) => s.kind !== 'ClauseHighlight')
+  return all.filter((s) => s.kind === 'ClauseHighlight')
+}
+
 export function App() {
   const [status, setStatus] = useState<Status>({ state: 'loading' })
+  const [mode, setMode] = useState<Mode>(INITIAL_MODE)
+  const intents = useIntents(FOCUS)
 
   useEffect(() => {
     let cancelled = false
@@ -176,6 +222,16 @@ export function App() {
     }
   }, [])
 
+  const scene = status.state === 'ready' ? status.scene : null
+  const allSegments = useMemo(() => (scene ? resolveLinks(scene) : []), [scene])
+  const active = activeElement(intents)
+  const highlight = useMemo(() => {
+    if (!scene || !active) return undefined
+    const set = relatedIds(scene, active)
+    set.add(active)
+    return set
+  }, [scene, active])
+
   if (status.state === 'loading') return <div className="hud">loading reduction…</div>
   if (status.state === 'error') return <div className="hud">error: {status.message}</div>
 
@@ -185,6 +241,8 @@ export function App() {
   const view = frameCamera(shown, window.innerWidth / window.innerHeight)
   const graph = shown.find((w) => w.kind === 'graph')
   const solutionCount = graph?.nodes.filter((n) => n.color === 'Solution').length ?? 0
+  const linked = WORLD === 'both'
+  const segments = linked ? segmentsForMode(allSegments, mode) : []
 
   return (
     <>
@@ -196,16 +254,23 @@ export function App() {
         {shown.map((world) => (
           <group key={world.id}>
             {world.kind === 'formula' ? (
-              <FormulaWorld world={world} />
+              <FormulaWorld world={world} intents={intents} highlight={highlight} />
             ) : (
-              <GraphWorld world={world} />
+              <GraphWorld world={world} intents={intents} highlight={highlight} />
             )}
             <WorldTitle world={world} />
           </group>
         ))}
+        <Correspondences
+          segments={segments}
+          direction={MODES[mode].direction}
+          emphasised={highlight}
+          accent={mode === 'solution' ? edgeColor('Solution') : undefined}
+        />
         <OrbitControls enableDamping={!STATIC} makeDefault target={view.center} />
         <ReadySignal />
       </Canvas>
+
       <div className="hud">
         <div>
           <strong>{status.scene.reductionName}</strong>
@@ -224,8 +289,32 @@ export function App() {
           {status.scene.links.length} gadgets
         </div>
         <div className="dim">{status.source}</div>
-        <div className="dim">{STATIC ? 'static' : 'drag to orbit · scroll to zoom'}</div>
       </div>
+
+      {linked && (
+        <div className="controls">
+          <div className="row">
+            {(Object.keys(MODES) as Mode[]).map((m) => (
+              <button
+                type="button"
+                key={m}
+                className={m === mode ? 'active' : ''}
+                onClick={() => setMode(m)}
+              >
+                {MODES[m].label}
+              </button>
+            ))}
+          </div>
+          <div className="hint">
+            {MODES[mode].hint} · {segments.length} link{segments.length === 1 ? '' : 's'}
+          </div>
+          <div className="hint dim">
+            {active
+              ? `${active} — click to ${intents.selected === active ? 'unpin' : 'pin'}`
+              : 'hover a literal or vertex to trace it'}
+          </div>
+        </div>
+      )}
     </>
   )
 }

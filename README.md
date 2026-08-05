@@ -7,11 +7,24 @@ The existing D3 views render each problem flat and in isolation. This adds a **t
 spatial scene showing a reduction and the correspondence between its two sides. Flat in the browser
 first; VR is an upgrade on the same scene at the same URL.
 
-**Status:** slice 2 — both sides of the 3SAT → CLIQUE reduction render from the live API. The
-formula appears as clause shelves, the reduced graph as three clause hulls with the k-clique spanning
-them. The two are not yet *linked* — gadget correspondences and XR come next.
+**Status:** slice 3 — the two sides are linked. Gadget correspondences arc across the gap in three
+modes, and selecting any element traces it to its counterpart in the other world. XR is next.
 
-![3SAT and the reduced clique](docs/slice2.png)
+![the certificate mapping back to a satisfying assignment](docs/slice3.png)
+
+## Highlight modes
+
+| Mode | Shows | Direction |
+|---|---|---|
+| **Show reduction** | each clause → its cluster of vertices (3 links) | 3SAT → Clique |
+| **Highlight gadgets** | each literal → its one vertex (9 links) | 3SAT → Clique |
+| **Map certificate** | the k-clique → a satisfying assignment (3 links) | **Clique → 3SAT** |
+
+The first two mirror switches Redux_GUI already has. The third is the one worth having: reductions
+run forward but certificates map *backward*, and "which way does the arrow go" is the misconception
+this whole view exists to attack. Arrowheads follow the actual direction.
+
+Hover or click any literal or vertex to trace just that correspondence and dim the rest.
 
 ## Quick start
 
@@ -43,6 +56,8 @@ playground/public/fonts/ Self-hosted font subset — see its NOTICE.md, the defa
 
 | Param | Effect |
 |---|---|
+| `?mode=reduction\|gadgets\|solution` | which correspondences to draw; default `reduction` |
+| `?focus=<id>` | pre-select an element, e.g. `?focus=x2_2` — deep-links a specific correspondence |
 | `?world=from` / `?world=to` | show one world alone; default `both` |
 | `?source=fixtures` | render the committed capture instead of calling the API |
 | `?frame=0` | base (unsolved) frame; default is the solved frame |

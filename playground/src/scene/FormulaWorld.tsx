@@ -1,6 +1,8 @@
 import { Text } from '@react-three/drei'
-import { nodeColor, type World } from '@redux-xvr/layout'
+import { nodeColor } from '@redux-xvr/layout'
 import { DoubleSide } from 'three'
+import { elementHandlers } from '../interaction.js'
+import type { WorldViewProps } from './GraphWorld.js'
 import { FONT_URL } from './typography.js'
 
 const TOKEN_WIDTH = 0.78
@@ -14,7 +16,7 @@ const TEXT_Z = TOKEN_DEPTH / 2 + 0.01
 
 /** The formula panel is a flat sheet: symbolic content reads better arranged the
  *  way it is written than spread through depth. */
-function Shelves({ world }: { world: World }) {
+function Shelves({ world }: WorldViewProps) {
   return (
     <>
       {world.groups.map((group) => (
@@ -30,21 +32,30 @@ function Shelves({ world }: { world: World }) {
   )
 }
 
-function Literals({ world }: { world: World }) {
+function Literals({ world, intents, highlight }: WorldViewProps) {
   return (
     <>
       {world.nodes.map((node) => {
         const satisfied = node.color === 'Solution'
         return (
           <group key={node.id} position={node.position as unknown as [number, number, number]}>
-            <mesh>
+            <mesh
+              scale={highlight?.has(node.id) ? 1.16 : 1}
+              {...(intents ? elementHandlers(node.id, intents) : {})}
+            >
               <boxGeometry args={[TOKEN_WIDTH, TOKEN_HEIGHT, TOKEN_DEPTH]} />
               <meshStandardMaterial
                 color={nodeColor(node.color)}
                 roughness={0.55}
                 metalness={0.05}
-                emissive={satisfied ? nodeColor(node.color) : '#000000'}
-                emissiveIntensity={satisfied ? 0.3 : 0}
+                emissive={
+                  highlight?.has(node.id)
+                    ? '#ffffff'
+                    : satisfied
+                      ? nodeColor(node.color)
+                      : '#000000'
+                }
+                emissiveIntensity={highlight?.has(node.id) ? 0.5 : satisfied ? 0.3 : 0}
               />
             </mesh>
             {/* Flat on the token, not billboarded: a rotating text quad clips into
@@ -71,7 +82,7 @@ function Literals({ world }: { world: World }) {
  * they are decoration, not structure. Without them the panel is a grid of tiles;
  * with them it is recognisably the formula the student typed.
  */
-function Connectives({ world }: { world: World }) {
+function Connectives({ world }: WorldViewProps) {
   const byId = new Map(world.nodes.map((n) => [n.id, n]))
 
   const disjunctions = world.groups.flatMap((group) => {
@@ -125,12 +136,12 @@ function Connectives({ world }: { world: World }) {
   )
 }
 
-export function FormulaWorld({ world }: { world: World }) {
+export function FormulaWorld({ world, intents, highlight }: WorldViewProps) {
   return (
     <group position={world.origin as unknown as [number, number, number]} scale={world.scale}>
       <Shelves world={world} />
       <Connectives world={world} />
-      <Literals world={world} />
+      <Literals world={world} intents={intents} highlight={highlight} />
     </group>
   )
 }
