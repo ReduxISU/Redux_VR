@@ -5,7 +5,7 @@
  * headless, and portable to CI. Waits on window.__sceneReady, never a timer.
  *
  *   node tools/shoot.ts [name] [--url=...] [--width=1280] [--height=720] [--live]
- *                       [--click=x,y] [--await-text="..."]
+ *                       [--click=x,y] [--await-text="..."] [--fake-xr]
  *
  * --click issues a real mouse click at viewport coordinates, which is how the
  * in-scene UI gets exercised: R3F raycasts it exactly as it would a controller ray.
@@ -41,6 +41,25 @@ const browser = await chromium.launch({
 })
 
 const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 })
+
+// Headless Chromium exposes no navigator.xr. Stubbing it exercises the entry
+// path — support detection and button state — but says nothing about stereo
+// rendering or controllers, which need the Immersive Web Emulator or hardware.
+if (process.argv.includes('--fake-xr')) {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'xr', {
+      configurable: true,
+      value: {
+        isSessionSupported: async (mode: string) => mode === 'immersive-vr',
+        requestSession: async () => {
+          throw new Error('stub session')
+        },
+        addEventListener() {},
+        removeEventListener() {},
+      },
+    })
+  })
+}
 
 const errors: string[] = []
 page.on('console', (m) => {

@@ -38,8 +38,10 @@ export function panelWidth(open: boolean): number {
   return (open ? Math.max(bar, listWidth()) : bar) + PANEL.pad * 2
 }
 
+const TITLE_H = 0.46
+
 export function panelHeight(open: boolean): number {
-  const base = PANEL.modeH + 0.5 + PANEL.modeH
+  const base = TITLE_H + PANEL.modeH + 0.5 + PANEL.modeH
   return (open ? base + listHeight() + PANEL.gap : base) + PANEL.pad * 2
 }
 
@@ -141,6 +143,7 @@ export interface ControlPanelProps {
   activeMode: string
   onMode: (key: string) => void
   hint: string
+  title: string
   catalog: CatalogItem[]
   currentReduction: string
   onReduction: (className: string) => void
@@ -155,6 +158,7 @@ export function ControlPanel({
   activeMode,
   onMode,
   hint,
+  title,
   catalog,
   currentReduction,
   onReduction,
@@ -172,7 +176,8 @@ export function ControlPanel({
   const hidden = catalog.length - selectable.length
   const page = selectable.slice(0, PANEL.cols * PANEL.rows)
 
-  const modeY = top - PANEL.modeH / 2
+  const titleY = top - TITLE_H / 2
+  const modeY = titleY - TITLE_H / 2 - PANEL.modeH / 2
   const hintY = modeY - PANEL.modeH / 2 - 0.22
   const toggleY = hintY - 0.22 - PANEL.modeH / 2
   const listTop = toggleY - PANEL.modeH / 2 - PANEL.gap
@@ -187,6 +192,20 @@ export function ControlPanel({
         <planeGeometry args={[w + 0.06, h + 0.06]} />
         <meshBasicMaterial color="#2a3340" transparent opacity={0.95} />
       </mesh>
+
+      {/* Repeated from the DOM HUD on purpose: that overlay does not exist inside
+          an immersive session, so anything a student needs must be geometry. */}
+      <Text
+        font={FONT_URL}
+        position={[0, titleY, 0]}
+        fontSize={0.26}
+        color="#e7ecf3"
+        anchorX="center"
+        anchorY="middle"
+        maxWidth={w - 0.8}
+      >
+        {title}
+      </Text>
 
       {modes.map((m, i) => (
         <Button3D

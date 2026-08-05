@@ -1,5 +1,6 @@
-import { Billboard, OrbitControls, Text } from '@react-three/drei'
+import { Billboard, Text } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { XR } from '@react-three/xr'
 import {
   buildScene,
   certificateSegments,
@@ -25,7 +26,9 @@ import { ControlPanel, panelHeight, panelWidth } from './scene/ControlPanel.js'
 import { Correspondences, type LinkDirection } from './scene/Correspondences.js'
 import { FormulaWorld } from './scene/FormulaWorld.js'
 import { GraphWorld } from './scene/GraphWorld.js'
+import { FlatControls, type SceneExtent, Staged } from './scene/Staged.js'
 import { FONT_URL } from './scene/typography.js'
+import { useXRSupport, type XRSupport, xrStore } from './xr.js'
 
 const params = new URLSearchParams(window.location.search)
 const STATIC = params.get('static') === '1'
@@ -209,6 +212,8 @@ function frameCamera(worlds: World[], aspect: number, menuOpen: boolean) {
       center[1] + forward[1] * distance,
       center[2] + forward[2] * distance,
     ] as [number, number, number],
+    // Reused to normalise the scene to human scale inside a headset.
+    extent: { center: center as [number, number, number], width: halfW * 2 } as SceneExtent,
   }
 }
 
@@ -230,6 +235,50 @@ function WorldTitle({ world }: { world: World }) {
   )
 }
 
+/**
+ * Entering XR needs a real user gesture, and this button must exist *before* the
+ * session does — so it is DOM, unlike every other control. It is also the only
+ * DOM control left: once the session starts, the overlay is gone and the in-scene
+ * panel is the whole interface.
+ */
+function EnterVR({ support }: { support: XRSupport }) {
+  const [failure, setFailure] = useState<string | null>(null)
+
+  const label = {
+    checking: 'checking for WebXR…',
+    supported: 'Enter VR',
+    unsupported: 'No VR headset detected',
+    insecure: 'WebXR needs HTTPS or localhost',
+  }[support]
+
+  // A session request rejects whenever the user declines the permission prompt or
+  // the runtime is unavailable. Unhandled, that surfaces as an uncaught error.
+  const enter = () => {
+    setFailure(null)
+    Promise.resolve(xrStore.enterVR()).catch((err: Error) =>
+      setFailure(err.message || 'could not start the session'),
+    )
+  }
+
+  return (
+    <div className="xr-entry">
+      <button
+        type="button"
+        disabled={support !== 'supported'}
+        onClick={enter}
+        title={
+          support === 'unsupported'
+            ? 'Install the Immersive Web Emulator extension, or connect a headset'
+            : undefined
+        }
+      >
+        {label}
+      </button>
+      {failure && <div className="xr-error">VR unavailable — {failure}</div>}
+    </div>
+  )
+}
+
 function segmentsForMode(all: LinkSegment[], mode: Mode): LinkSegment[] {
   if (mode === 'solution') return certificateSegments(all)
   if (mode === 'gadgets') return all.filter((s) => s.kind !== 'ClauseHighlight')
@@ -244,6 +293,7 @@ export function App() {
   const [menuOpen, setMenuOpen] = useState(MENU_OPEN)
   const [busy, setBusy] = useState(false)
   const intents = useIntents(FOCUS)
+  const xrSupport = useXRSupport()
 
   const buildInto = useCallback((source: string, bundle: Parameters<typeof buildScene>[0]) => {
     const frameIndex = FRAME === null ? undefined : Number(FRAME)
@@ -325,50 +375,57 @@ export function App() {
   return (
     <>
       <Canvas camera={{ position: view.position, fov: FOV }}>
-        <color attach="background" args={['#12151a']} />
-        <ambientLight intensity={0.75} />
-        <directionalLight position={[5, 8, 6]} intensity={1.5} />
-        <directionalLight position={[-6, -3, -5]} intensity={0.35} />
-        {shown.map((world) => (
-          <group key={world.id}>
-            {world.kind === 'formula' ? (
-              <FormulaWorld world={world} intents={intents} highlight={highlight} />
-            ) : (
-              <GraphWorld world={world} intents={intents} highlight={highlight} />
+        <XR store={xrStore}>
+          <color attach="background" args={['#12151a']} />
+          <ambientLight intensity={0.75} />
+          <directionalLight position={[5, 8, 6]} intensity={1.5} />
+          <directionalLight position={[-6, -3, -5]} intensity={0.35} />
+          <Staged extent={view.extent}>
+            {shown.map((world) => (
+              <group key={world.id}>
+                {world.kind === 'formula' ? (
+                  <FormulaWorld world={world} intents={intents} highlight={highlight} />
+                ) : (
+                  <GraphWorld world={world} intents={intents} highlight={highlight} />
+                )}
+                <WorldTitle world={world} />
+              </group>
+            ))}
+            <Correspondences
+              segments={segments}
+              direction={MODES[effectiveMode].direction}
+              emphasised={highlight}
+              accent={effectiveMode === 'solution' ? edgeColor('Solution') : undefined}
+            />
+            {linked && (
+              <ControlPanel
+                title={status.scene.reductionName}
+                anchor={panelAnchor(shown, menuOpen)}
+                modes={(Object.keys(MODES) as Mode[]).map((m) => ({
+                  key: m,
+                  label: MODES[m].label,
+                  count: segmentsForMode(allSegments, m).length,
+                }))}
+                activeMode={effectiveMode}
+                onMode={(m) => setMode(m as Mode)}
+                hint={`${MODES[effectiveMode].hint} · ${segments.length} link${
+                  segments.length === 1 ? '' : 's'
+                }`}
+                catalog={catalog}
+                currentReduction={reduction}
+                onReduction={setReduction}
+                open={menuOpen}
+                onToggle={() => setMenuOpen((v) => !v)}
+                busy={busy}
+              />
             )}
-            <WorldTitle world={world} />
-          </group>
-        ))}
-        <Correspondences
-          segments={segments}
-          direction={MODES[effectiveMode].direction}
-          emphasised={highlight}
-          accent={effectiveMode === 'solution' ? edgeColor('Solution') : undefined}
-        />
-        {linked && (
-          <ControlPanel
-            anchor={panelAnchor(shown, menuOpen)}
-            modes={(Object.keys(MODES) as Mode[]).map((m) => ({
-              key: m,
-              label: MODES[m].label,
-              count: segmentsForMode(allSegments, m).length,
-            }))}
-            activeMode={effectiveMode}
-            onMode={(m) => setMode(m as Mode)}
-            hint={`${MODES[effectiveMode].hint} · ${segments.length} link${
-              segments.length === 1 ? '' : 's'
-            }`}
-            catalog={catalog}
-            currentReduction={reduction}
-            onReduction={setReduction}
-            open={menuOpen}
-            onToggle={() => setMenuOpen((v) => !v)}
-            busy={busy}
-          />
-        )}
-        <OrbitControls enableDamping={!STATIC} makeDefault target={view.center} />
-        <ReadySignal />
+          </Staged>
+          <FlatControls target={view.center} damping={!STATIC} />
+          <ReadySignal />
+        </XR>
       </Canvas>
+
+      <EnterVR support={xrSupport} />
 
       <div className="hud">
         <div>

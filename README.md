@@ -7,9 +7,9 @@ The existing D3 views render each problem flat and in isolation. This adds a **t
 spatial scene showing a reduction and the correspondence between its two sides. Flat in the browser
 first; VR is an upgrade on the same scene at the same URL.
 
-**Status:** slice 4b — reductions are chosen from an in-scene menu, so switching works without
-leaving the view. All controls are scene geometry rather than DOM, because an immersive XR session
-has no HTML overlay: the same panel serves the flat browser and the headset. XR entry is next.
+**Status:** slice 5 — WebXR entry works. The scene is unchanged in a headset; only its placement and
+the camera source differ. Stereo rendering, controllers and comfort are **not yet verified on real
+hardware** — see below.
 
 ![the in-scene reduction menu](docs/menu.png)
 
@@ -124,10 +124,40 @@ R3F raycasts that click exactly as it will raycast an XR controller ray.
 ## WebXR
 
 `localhost` counts as a secure context, so WebXR works there over plain http — no certs needed for
-local development. Test without hardware using the
+local development. Press **Enter VR** (top right); it is disabled with a reason when no runtime is
+available. Entering requires a user gesture, which is why that one button is DOM while every other
+control is scene geometry.
+
+**Nothing about the scene changes in a headset.** Only two things differ: the camera comes from the
+headset instead of `OrbitControls`, and the scene is normalised to human scale — one unit is one
+metre in XR, so a 20-unit scene would otherwise be a 20-metre wall. See `stageTransform` in
+`src/xr.ts`; the placement arithmetic is pure and unit-tested even though stereo rendering is not.
+
+Controller rays raise ordinary R3F pointer events, the same ones a mouse raises, so the menu and the
+element highlighting work in a session without a second interaction model — that is why
+`interaction.ts` was written in terms of intents back in slice 3 rather than after.
+
+### Testing without hardware
+
+Install the
 [Immersive Web Emulator](https://chromewebstore.google.com/detail/immersive-web-emulator/cgffilbpcibhmcfbgggfhfolhkfbhmik)
-extension. For a real headset on the LAN you need either HTTPS or `adb reverse tcp:5173 tcp:5173`
-over USB, which preserves the `localhost` origin.
+(Chrome/Edge). It fakes a headset and two controllers with draggable poses, and validates session
+lifecycle, per-eye rendering, controller poses and select events. It says nothing about whether the
+experience is *good*.
+
+### What is verified, and what is not
+
+| | |
+|---|---|
+| ✅ automated | flat rendering unaffected by the XR wrapper; support detection; button state; session-rejection handling; stage-transform arithmetic |
+| 🔶 emulator | session lifecycle, per-eye rendering, controller rays hitting the menu |
+| ❌ hardware only | whether stereo depth actually helps students read the graph; comfort and scale; text legibility at real per-eye resolution; frame rate under stereo load |
+
+The last row is the core pedagogical claim of this project and is unfalsifiable on a monitor. Any
+WebXR-capable headset answers it — the Quest browser supports WebXR; no dev kit is required.
+
+For a real headset on the LAN you need either HTTPS or `adb reverse tcp:5173 tcp:5173` over USB,
+which preserves the `localhost` origin and its secure context.
 
 ## Data
 
