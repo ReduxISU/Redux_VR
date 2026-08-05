@@ -5,21 +5,15 @@ import meta from '../../../fixtures/meta.json' with { type: 'json' }
 import reduce from '../../../fixtures/reduce.json' with { type: 'json' }
 import sat3Frames from '../../../fixtures/sat3-frames.json' with { type: 'json' }
 import { buildScene, layoutFormula } from '../src/index.js'
-import type {
-  ApiFormulaFrame,
-  ApiGraphFrame,
-  ApiReduction,
-  Gadget,
-  ReductionBundle,
-} from '../src/types.js'
+import type { AnyFrame, ApiReduction, Gadget, ReductionBundle } from '../src/types.js'
 
-const frames = sat3Frames as unknown as ApiFormulaFrame[]
+const frames = sat3Frames as unknown as AnyFrame[]
 
 const bundle: ReductionBundle = {
   reduction: reduce as unknown as ApiReduction,
   gadgets: gadgets as Gadget[],
-  fromFrames: frames,
-  toFrames: cliqueFrames as unknown as ApiGraphFrame[],
+  from: { problemName: '3SAT', frames },
+  to: { problemName: 'Clique', frames: cliqueFrames as unknown as AnyFrame[] },
   solution: meta.solution,
 }
 

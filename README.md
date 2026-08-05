@@ -7,8 +7,9 @@ The existing D3 views render each problem flat and in isolation. This adds a **t
 spatial scene showing a reduction and the correspondence between its two sides. Flat in the browser
 first; VR is an upgrade on the same scene at the same URL.
 
-**Status:** slice 3 — the two sides are linked. Gadget correspondences arc across the gap in three
-modes, and selecting any element traces it to its counterpart in the other world. XR is next.
+**Status:** slice 4a — any renderable reduction in the catalog can be shown, not just 3SAT → CLIQUE.
+The world builder dispatches on each side's representation family, so graph→graph and
+formula→formula reductions work with no new code. The in-scene menu and XR come next.
 
 ![the certificate mapping back to a satisfying assignment](docs/slice3.png)
 
@@ -24,7 +25,31 @@ The first two mirror switches Redux_GUI already has. The third is the one worth 
 run forward but certificates map *backward*, and "which way does the arrow go" is the misconception
 this whole view exists to attack. Arrowheads follow the actual direction.
 
-Hover or click any literal or vertex to trace just that correspondence and dim the rest.
+Hover or click any literal or vertex to trace just that correspondence and dim the rest. A mode with
+nothing to draw is disabled rather than silently empty.
+
+## Reductions
+
+The picker is driven by `GET /Navigation/Reductions` — Redux's own catalog. Each entry is classified
+by what it can actually support, so the view never implies more than the backend provides:
+
+| State | Meaning | Count |
+|---|---|---:|
+| **linked** | renders, with gadget correspondences | 7 |
+| **unlinked** | renders, but the backend publishes no gadgets | 4 |
+| **unsupported** | a side uses a family this renderer cannot draw (`Set D3`, `Dynamic Table`) | 9 |
+
+Switch with `?reduction=<className>`, e.g. `?reduction=sipserReductionVertexCover`.
+
+![CLIQUE to Vertex Cover, rendered with no reduction-specific code](docs/graph-to-graph.png)
+
+A problem's visualization is chosen by **capability** — the first candidate whose `visualizationType`
+this renderer understands — not by list order. CLIQUE publishes both a D3 graph and a LaTeX view, and
+picking by order is the bug the existing GUI has.
+
+Groups come from gadgets when a reduction publishes them, and are otherwise absent: a graph with no
+recovered partition draws no hulls, because asserting a structure the reduction does not have would
+be a lie.
 
 ## Quick start
 
@@ -56,6 +81,7 @@ playground/public/fonts/ Self-hosted font subset — see its NOTICE.md, the defa
 
 | Param | Effect |
 |---|---|
+| `?reduction=<className>` | which reduction to show; default `SipserReduceToCliqueStandard` |
 | `?mode=reduction\|gadgets\|solution` | which correspondences to draw; default `reduction` |
 | `?focus=<id>` | pre-select an element, e.g. `?focus=x2_2` — deep-links a specific correspondence |
 | `?world=from` / `?world=to` | show one world alone; default `both` |

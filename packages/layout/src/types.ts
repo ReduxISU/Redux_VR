@@ -69,12 +69,22 @@ export interface ApiReduction {
   reductionTo: ApiProblem
 }
 
+/** A visualization frame of any representation family. Frames carry no
+ *  discriminator, so the family is sniffed from the keys — see detectFrameKind. */
+export type AnyFrame = ApiGraphFrame | ApiFormulaFrame
+
+/** One side of a reduction, as fetched. */
+export interface WorldSource {
+  problemName: string
+  frames: AnyFrame[]
+}
+
 /** Everything the layout needs, as fetched. */
 export interface ReductionBundle {
   reduction: ApiReduction
   gadgets: Gadget[]
-  fromFrames: ApiFormulaFrame[]
-  toFrames: ApiGraphFrame[]
+  from: WorldSource
+  to: WorldSource
   solution: string
 }
 

@@ -1,7 +1,9 @@
 import { boundingRadius, boundsOf, centroid, layoutClusters } from './clique.js'
+import { detectFrameKind } from './frames.js'
 import { dedupeLinks, resolveGroups } from './parse.js'
 import { layoutFormula } from './sat3.js'
 import type {
+  AnyFrame,
   ApiFormulaFrame,
   ApiGraphFrame,
   CorrespondenceLink,
@@ -12,6 +14,7 @@ import type {
   SceneNode,
   Vec3,
   World,
+  WorldSource,
 } from './types.js'
 
 export interface BuildOptions {
@@ -24,9 +27,15 @@ export interface BuildOptions {
 }
 
 const ORIGIN: Vec3 = [0, 0, 0]
+type Side = 'from' | 'to'
 
-function graphWorld(frame: ApiGraphFrame, bundle: ReductionBundle): World {
-  const groups = resolveGroups(frame.nodes, bundle.gadgets)
+function graphWorld(
+  frame: ApiGraphFrame,
+  side: Side,
+  problemName: string,
+  gadgets: ReductionBundle['gadgets'],
+): World {
+  const groups = resolveGroups(frame.nodes, gadgets)
   const { positions, frames } = layoutClusters(groups)
 
   const nodeGroup = new Map<string, string>()
@@ -53,19 +62,24 @@ function graphWorld(frame: ApiGraphFrame, bundle: ReductionBundle): World {
       directed: l.directed,
     }))
 
-  const sceneGroups: SceneGroup[] = [...groups].map(([id, members]) => {
-    const points = members.map((m) => positions.get(m) ?? ORIGIN)
-    const center = centroid(points)
-    return {
-      id,
-      label: id,
-      members,
-      centroid: center,
-      normal: frames.get(id)?.normal ?? ([0, 0, 1] as Vec3),
-      radius: boundingRadius(points, center),
-      color: 'ClauseHighlight',
-    }
-  })
+  // A single group means no partition was recovered — drawing one hull around
+  // every vertex would assert a structure the reduction does not have.
+  const partitioned = groups.size > 1
+  const sceneGroups: SceneGroup[] = partitioned
+    ? [...groups].map(([id, members]) => {
+        const points = members.map((m) => positions.get(m) ?? ORIGIN)
+        const center = centroid(points)
+        return {
+          id,
+          label: id,
+          members,
+          centroid: center,
+          normal: frames.get(id)?.normal ?? ([0, 0, 1] as Vec3),
+          radius: boundingRadius(points, center),
+          color: 'ClauseHighlight',
+        }
+      })
+    : []
 
   // Group hulls are drawn around their members, so bounds must cover them too or
   // the world will overlap its neighbour by the hull radius.
@@ -75,9 +89,9 @@ function graphWorld(frame: ApiGraphFrame, bundle: ReductionBundle): World {
   ])
 
   return {
-    id: 'to',
+    id: side,
     kind: 'graph',
-    problemName: bundle.reduction.reductionTo.problemName,
+    problemName,
     origin: ORIGIN,
     scale: 1,
     nodes,
@@ -87,7 +101,7 @@ function graphWorld(frame: ApiGraphFrame, bundle: ReductionBundle): World {
   }
 }
 
-function formulaWorld(frame: ApiFormulaFrame, bundle: ReductionBundle): World {
+function formulaWorld(frame: ApiFormulaFrame, side: Side, problemName: string): World {
   const { positions, shelves } = layoutFormula(frame.clauses)
 
   const nodes: SceneNode[] = frame.clauses.flatMap((clause) =>
@@ -120,9 +134,9 @@ function formulaWorld(frame: ApiFormulaFrame, bundle: ReductionBundle): World {
   ])
 
   return {
-    id: 'from',
+    id: side,
     kind: 'formula',
-    problemName: bundle.reduction.reductionFrom.problemName,
+    problemName,
     origin: ORIGIN,
     scale: 1,
     nodes,
@@ -132,10 +146,30 @@ function formulaWorld(frame: ApiFormulaFrame, bundle: ReductionBundle): World {
   }
 }
 
+/**
+ * Build whichever world the frame describes.
+ *
+ * Either side of a reduction may be any family — most reductions are graph to
+ * graph, and SAT to SAT3 is formula to formula. Dispatching on the frame rather
+ * than hardcoding "source is a formula, target is a graph" is what makes the next
+ * reduction a configuration change instead of new code.
+ */
+export function buildWorld(
+  frame: AnyFrame,
+  side: Side,
+  source: WorldSource,
+  gadgets: ReductionBundle['gadgets'],
+): World | undefined {
+  const kind = detectFrameKind(frame)
+  if (kind === 'graph') return graphWorld(frame as ApiGraphFrame, side, source.problemName, gadgets)
+  if (kind === 'formula') return formulaWorld(frame as ApiFormulaFrame, side, source.problemName)
+  return undefined
+}
+
 const width = (w: World) => (w.bounds.max[0] - w.bounds.min[0]) * w.scale
 
-/** Enlarge the compact symbolic world so it carries comparable visual weight to
- *  the graph — otherwise the formula reads as a caption rather than a peer. */
+/** Enlarge a compact symbolic world so it carries comparable visual weight to a
+ *  sprawling spatial one — otherwise it reads as a caption rather than a peer. */
 function matchVisualWeight(from: World, to: World, fraction: number): void {
   const natural = from.bounds.max[0] - from.bounds.min[0]
   if (natural <= 0) return
@@ -168,22 +202,23 @@ function clampIndex(requested: number, count: number): number {
  * always produces byte-identical positions, so CI can snapshot them.
  */
 export function buildScene(bundle: ReductionBundle, options: BuildOptions = {}): SceneGraph {
-  const frameCount = bundle.toFrames.length
+  const frameCount = bundle.to.frames.length
   const requested = options.frameIndex ?? frameCount - 1
   const frameIndex = clampIndex(requested, frameCount)
 
-  const toFrame = bundle.toFrames[frameIndex]
+  const toFrame = bundle.to.frames[frameIndex]
   if (!toFrame) throw new Error('reduction bundle has no target visualization frames')
+
+  const to = buildWorld(toFrame, 'to', bundle.to, bundle.gadgets)
+  if (!to) throw new Error(`unsupported target representation for ${bundle.to.problemName}`)
 
   // The two problems are visualized independently and need not have the same
   // number of frames, so the source index is clamped on its own.
-  const fromFrame = bundle.fromFrames[clampIndex(requested, bundle.fromFrames.length)]
+  const fromFrame = bundle.from.frames[clampIndex(requested, bundle.from.frames.length)]
+  const from = fromFrame ? buildWorld(fromFrame, 'from', bundle.from, bundle.gadgets) : undefined
 
-  const to = graphWorld(toFrame, bundle)
   const worlds: World[] = []
-
-  if (fromFrame) {
-    const from = formulaWorld(fromFrame, bundle)
+  if (from) {
     matchVisualWeight(from, to, options.sourceWidthFraction ?? 0.62)
     placeSideBySide(from, to, options.worldGap ?? 4.5)
     worlds.push(from)

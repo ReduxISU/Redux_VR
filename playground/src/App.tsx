@@ -11,7 +11,14 @@ import {
   type World,
 } from '@redux-xvr/layout'
 import { useEffect, useMemo, useState } from 'react'
-import { BASE_URL, DEMO_INSTANCE, fetchBundle, fixtureBundle } from './api/redux.js'
+import {
+  BASE_URL,
+  type CatalogItem,
+  DEMO_REDUCTION,
+  fetchBundleFor,
+  fetchCatalog,
+  fixtureBundle,
+} from './api/redux.js'
 import { activeElement, useIntents } from './interaction.js'
 import { Correspondences, type LinkDirection } from './scene/Correspondences.js'
 import { FormulaWorld } from './scene/FormulaWorld.js'
@@ -24,22 +31,25 @@ const USE_FIXTURES = params.get('source') === 'fixtures'
 const FRAME = params.get('frame')
 const WORLD = params.get('world') ?? 'both'
 const FOCUS = params.get('focus')
+const REDUCTION = params.get('reduction') ?? DEMO_REDUCTION
 
 /** Mirrors the switches Redux_GUI already exposes, plus the backward direction. */
 const MODES = {
   reduction: {
     label: 'Show reduction',
-    hint: 'each clause becomes a cluster of vertices',
+    // Wording stays family-neutral: the same modes now serve graph-to-graph and
+    // formula-to-formula reductions, not just 3SAT to Clique.
+    hint: 'group level — each source group becomes a cluster',
     direction: 'forward' as LinkDirection,
   },
   gadgets: {
     label: 'Highlight gadgets',
-    hint: 'each literal becomes exactly one vertex',
+    hint: 'element level — each source element becomes its counterpart',
     direction: 'forward' as LinkDirection,
   },
   solution: {
     label: 'Map certificate',
-    hint: 'the k-clique maps back to a satisfying assignment',
+    hint: 'the solution maps back to a source certificate',
     direction: 'backward' as LinkDirection,
   },
 } as const
@@ -88,9 +98,24 @@ const FRAMING_MARGIN = 1.28
  *  sideways angle shears the graph's near hull across it. */
 const VIEW_DIR: [number, number, number] = [0.12, 0.44, 1]
 
+/**
+ * Captioned below and in front of its world, like a figure caption.
+ *
+ * Below, because above collides with the HUD. In *front* — at the world's near
+ * face rather than its centre — because a spatial world has depth, and a caption
+ * at mid-depth renders buried inside the geometry.
+ */
+function titleAnchor(world: World): [number, number, number] {
+  return [
+    world.origin[0] + ((world.bounds.min[0] + world.bounds.max[0]) / 2) * world.scale,
+    world.origin[1] + world.bounds.min[1] * world.scale - 1.05,
+    world.origin[2] + world.bounds.max[2] * world.scale + 0.6,
+  ]
+}
+
 function worldSpacePositions(worlds: World[]) {
-  return worlds.flatMap((w) =>
-    w.nodes.map(
+  return worlds.flatMap((w) => [
+    ...w.nodes.map(
       (n) =>
         [
           n.position[0] * w.scale + w.origin[0],
@@ -98,7 +123,9 @@ function worldSpacePositions(worlds: World[]) {
           n.position[2] * w.scale + w.origin[2],
         ] as const,
     ),
-  )
+    // Include the caption so framing never clips it.
+    titleAnchor(w) as readonly [number, number, number],
+  ])
 }
 
 type V3 = readonly [number, number, number]
@@ -160,13 +187,7 @@ function frameCamera(worlds: World[], aspect: number) {
 
 function WorldTitle({ world }: { world: World }) {
   return (
-    <Billboard
-      position={[
-        world.origin[0] + ((world.bounds.min[0] + world.bounds.max[0]) / 2) * world.scale,
-        world.origin[1] + world.bounds.max[1] * world.scale + 1.2,
-        world.origin[2],
-      ]}
-    >
+    <Billboard position={titleAnchor(world)}>
       <Text
         font={FONT_URL}
         fontSize={0.42}
@@ -191,6 +212,7 @@ function segmentsForMode(all: LinkSegment[], mode: Mode): LinkSegment[] {
 export function App() {
   const [status, setStatus] = useState<Status>({ state: 'loading' })
   const [mode, setMode] = useState<Mode>(INITIAL_MODE)
+  const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const intents = useIntents(FOCUS)
 
   useEffect(() => {
@@ -209,8 +231,17 @@ export function App() {
       }
     }
 
-    fetchBundle(DEMO_INSTANCE)
-      .then(build(BASE_URL))
+    fetchCatalog()
+      .then(async (items) => {
+        if (cancelled) return
+        setCatalog(items)
+        const chosen = items.find((i) => i.className === REDUCTION) ?? items[0]
+        if (!chosen) throw new Error('catalog is empty')
+        if (chosen.capability.state === 'unsupported') {
+          throw new Error(`${chosen.className}: ${chosen.capability.reason}`)
+        }
+        build(`${chosen.source} → ${chosen.target} · ${BASE_URL}`)(await fetchBundleFor(chosen))
+      })
       .catch((err: Error) => {
         // Falling back rather than failing: a dead API should not blank the demo.
         console.warn(`live API failed (${err.message}); using fixtures`)
@@ -242,7 +273,11 @@ export function App() {
   const graph = shown.find((w) => w.kind === 'graph')
   const solutionCount = graph?.nodes.filter((n) => n.color === 'Solution').length ?? 0
   const linked = WORLD === 'both'
-  const segments = linked ? segmentsForMode(allSegments, mode) : []
+  const available = (Object.keys(MODES) as Mode[]).filter(
+    (m) => segmentsForMode(allSegments, m).length > 0,
+  )
+  const effectiveMode = available.includes(mode) ? mode : (available[0] ?? mode)
+  const segments = linked ? segmentsForMode(allSegments, effectiveMode) : []
 
   return (
     <>
@@ -263,9 +298,9 @@ export function App() {
         ))}
         <Correspondences
           segments={segments}
-          direction={MODES[mode].direction}
+          direction={MODES[effectiveMode].direction}
           emphasised={highlight}
-          accent={mode === 'solution' ? edgeColor('Solution') : undefined}
+          accent={effectiveMode === 'solution' ? edgeColor('Solution') : undefined}
         />
         <OrbitControls enableDamping={!STATIC} makeDefault target={view.center} />
         <ReadySignal />
@@ -289,24 +324,39 @@ export function App() {
           {status.scene.links.length} gadgets
         </div>
         <div className="dim">{status.source}</div>
+        {catalog.length > 0 && (
+          <div className="dim">
+            catalog: {catalog.filter((c) => c.capability.state === 'linked').length} linked ·{' '}
+            {catalog.filter((c) => c.capability.state === 'unlinked').length} unlinked ·{' '}
+            {catalog.filter((c) => c.capability.state === 'unsupported').length} unsupported
+          </div>
+        )}
       </div>
 
       {linked && (
         <div className="controls">
           <div className="row">
-            {(Object.keys(MODES) as Mode[]).map((m) => (
-              <button
-                type="button"
-                key={m}
-                className={m === mode ? 'active' : ''}
-                onClick={() => setMode(m)}
-              >
-                {MODES[m].label}
-              </button>
-            ))}
+            {(Object.keys(MODES) as Mode[]).map((m) => {
+              // A mode with nothing to draw is disabled rather than silently empty:
+              // most reductions publish no group-level gadgets at all.
+              const count = segmentsForMode(allSegments, m).length
+              return (
+                <button
+                  type="button"
+                  key={m}
+                  disabled={count === 0}
+                  title={count === 0 ? 'no correspondences of this kind published' : undefined}
+                  className={m === effectiveMode ? 'active' : ''}
+                  onClick={() => setMode(m)}
+                >
+                  {MODES[m].label}
+                </button>
+              )
+            })}
           </div>
           <div className="hint">
-            {MODES[mode].hint} · {segments.length} link{segments.length === 1 ? '' : 's'}
+            {MODES[effectiveMode].hint} · {segments.length} link
+            {segments.length === 1 ? '' : 's'}
           </div>
           <div className="hint dim">
             {active

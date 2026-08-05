@@ -91,3 +91,14 @@ canvas {
 .controls .hint.dim {
   opacity: 0.65;
 }
+
+.controls button:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  border-color: #262e39;
+}
+
+.controls button:disabled:hover {
+  border-color: #262e39;
+  color: #c6d2e2;
+}

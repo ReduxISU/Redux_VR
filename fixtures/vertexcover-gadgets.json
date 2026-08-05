@@ -1,0 +1,56 @@
+[
+  {
+    "color": "ElementHighlight",
+    "reductionFromIds": [
+      "1"
+    ],
+    "reductionToIds": [
+      "1"
+    ]
+  },
+  {
+    "color": "ElementHighlight",
+    "reductionFromIds": [
+      "2"
+    ],
+    "reductionToIds": [
+      "2"
+    ]
+  },
+  {
+    "color": "ElementHighlight",
+    "reductionFromIds": [
+      "3"
+    ],
+    "reductionToIds": [
+      "3"
+    ]
+  },
+  {
+    "color": "ElementHighlight",
+    "reductionFromIds": [
+      "4"
+    ],
+    "reductionToIds": [
+      "4"
+    ]
+  },
+  {
+    "color": "ElementHighlight",
+    "reductionFromIds": [
+      "5"
+    ],
+    "reductionToIds": [
+      "5"
+    ]
+  },
+  {
+    "color": "ElementHighlight",
+    "reductionFromIds": [
+      "6"
+    ],
+    "reductionToIds": [
+      "6"
+    ]
+  }
+]

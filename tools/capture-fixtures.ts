@@ -64,4 +64,37 @@ await write(
   await post(`ProblemProvider/visualizeReduction?reduction=${REDUCTION}&solution=${enc}`, INSTANCE),
 )
 
+// A second reduction, graph-to-graph, so the family generalisation has offline
+// coverage too: its vertices are plainly named, with no clause suffix to fall
+// back on, which is what most reductions actually look like.
+const VC_REDUCTION = 'sipserReductionVertexCover'
+const VC_INSTANCE =
+  '(({1,2,3,4,5,6},{{4,1},{1,2},{4,3},{3,2},{2,4},{5,2},{3,5},{5,4},{3,6},{6,4},{1,6}}),4)'
+const vcSolution = (await post(
+  'ProblemProvider/solve?solver=CliqueBruteForce',
+  VC_INSTANCE,
+)) as string
+console.log(`  clique solution: ${vcSolution}`)
+
+await write('vertexcover-meta', {
+  instance: VC_INSTANCE,
+  reduction: VC_REDUCTION,
+  solution: vcSolution,
+})
+await write(
+  'vertexcover-gadgets',
+  await post(`ProblemProvider/gadgets?reduction=${VC_REDUCTION}`, VC_INSTANCE),
+)
+await write(
+  'vertexcover-frames',
+  await post(
+    `ProblemProvider/visualizeReduction?reduction=${VC_REDUCTION}&solution=${encodeURIComponent(vcSolution)}`,
+    VC_INSTANCE,
+  ),
+)
+await write(
+  'clique-source-frames',
+  await post('ProblemProvider/visualize?visualization=CliqueDefaultVisualization', VC_INSTANCE),
+)
+
 console.log('done')

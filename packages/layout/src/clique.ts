@@ -78,9 +78,23 @@ export function layoutClusters(
     options.clusterRadius ??
     Math.max(3, (groupRadius * SEPARATION) / Math.sin(Math.PI / Math.max(count, 2)))
 
-  const anchors = anchorPositions(count, clusterRadius)
   const positions = new Map<string, Vec3>()
   const frames = new Map<string, GroupFrame>()
+
+  // Only some reductions carry gadget groupings. When there is no partition to
+  // preserve — most graph-to-graph reductions map vertices one-to-one — a single
+  // ring would read as a flat wheel, so spread the vertices over a sphere instead.
+  const only = count === 1 ? [...groups.entries()][0] : undefined
+  if (only) {
+    const [groupId, members] = only
+    const radius = Math.max(1.8, 0.62 * Math.sqrt(members.length) + 0.6)
+    const points = fibonacciSphere(members.length, radius)
+    members.forEach((id, i) => positions.set(id, points[i] ?? ([0, 0, 0] as Vec3)))
+    frames.set(groupId, { anchor: [0, 0, 0], normal: [0, 0, 1] })
+    return { positions, frames }
+  }
+
+  const anchors = anchorPositions(count, clusterRadius)
 
   let g = 0
   for (const [groupId, members] of groups) {

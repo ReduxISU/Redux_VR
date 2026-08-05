@@ -11,19 +11,13 @@ import {
   resolveLinks,
   worldPoint,
 } from '../src/index.js'
-import type {
-  ApiFormulaFrame,
-  ApiGraphFrame,
-  ApiReduction,
-  Gadget,
-  ReductionBundle,
-} from '../src/types.js'
+import type { AnyFrame, ApiReduction, Gadget, ReductionBundle } from '../src/types.js'
 
 const bundle: ReductionBundle = {
   reduction: reduce as unknown as ApiReduction,
   gadgets: gadgets as Gadget[],
-  fromFrames: sat3Frames as unknown as ApiFormulaFrame[],
-  toFrames: cliqueFrames as unknown as ApiGraphFrame[],
+  from: { problemName: '3SAT', frames: sat3Frames as unknown as AnyFrame[] },
+  to: { problemName: 'Clique', frames: cliqueFrames as unknown as AnyFrame[] },
   solution: meta.solution,
 }
 

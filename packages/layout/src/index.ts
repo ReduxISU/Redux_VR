@@ -3,13 +3,20 @@ export const LAYOUT_VERSION = '0.1.0'
 export type { ClusterLayout, ClusterLayoutOptions, GroupFrame } from './clique.js'
 export { boundingRadius, boundsOf, centroid, layoutClusters } from './clique.js'
 export { edgeColor, nodeColor, PALETTE } from './colors.js'
+export {
+  detectFrameKind,
+  isFormulaFrame,
+  isGraphFrame,
+  isRenderable,
+  RENDERABLE_KINDS,
+} from './frames.js'
 export type { LinkSegment } from './links.js'
 export { certificateSegments, relatedIds, resolveLinks, worldPoint } from './links.js'
 export { dedupeLinks, groupsFromGadgets, groupsFromNameSuffix, resolveGroups } from './parse.js'
 export type { FormulaLayout, FormulaLayoutOptions, Shelf } from './sat3.js'
 export { layoutFormula } from './sat3.js'
 export type { BuildOptions } from './scene.js'
-export { buildScene } from './scene.js'
+export { buildScene, buildWorld } from './scene.js'
 export * from './types.js'
 
 /** Deterministic PRNG. Layout must never call Math.random(). */

@@ -6,7 +6,7 @@ import reduce from '../../../fixtures/reduce.json' with { type: 'json' }
 import sat3Frames from '../../../fixtures/sat3-frames.json' with { type: 'json' }
 import { buildScene, dedupeLinks, resolveGroups } from '../src/index.js'
 import type {
-  ApiFormulaFrame,
+  AnyFrame,
   ApiGraphFrame,
   ApiReduction,
   Gadget,
@@ -16,8 +16,8 @@ import type {
 const bundle: ReductionBundle = {
   reduction: reduce as unknown as ApiReduction,
   gadgets: gadgets as Gadget[],
-  fromFrames: sat3Frames as ApiFormulaFrame[],
-  toFrames: cliqueFrames as unknown as ApiGraphFrame[],
+  from: { problemName: '3SAT', frames: sat3Frames as unknown as AnyFrame[] },
+  to: { problemName: 'Clique', frames: cliqueFrames as unknown as AnyFrame[] },
   solution: meta.solution,
 }
 
