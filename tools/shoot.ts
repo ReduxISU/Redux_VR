@@ -5,6 +5,10 @@
  * headless, and portable to CI. Waits on window.__sceneReady, never a timer.
  *
  *   node tools/shoot.ts [name] [--url=...] [--width=1280] [--height=720] [--live]
+ *                       [--click=x,y] [--await-text="..."]
+ *
+ * --click issues a real mouse click at viewport coordinates, which is how the
+ * in-scene UI gets exercised: R3F raycasts it exactly as it would a controller ray.
  */
 import { mkdir } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
@@ -48,6 +52,18 @@ let failed = false
 try {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
   await page.waitForFunction(() => window.__sceneReady === true, null, { timeout: 30_000 })
+
+  const click = arg('click', '')
+  if (click) {
+    const [cx, cy] = click.split(',').map(Number)
+    await page.mouse.click(cx ?? 0, cy ?? 0)
+    const expected = arg('await-text', '')
+    if (expected) {
+      await page.waitForFunction((t) => document.body.innerText.includes(t), expected, {
+        timeout: 30_000,
+      })
+    }
+  }
   // One extra rAF pair so the frame that set the flag is actually presented.
   await page.evaluate(
     () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),

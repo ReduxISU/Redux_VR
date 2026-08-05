@@ -10,16 +10,18 @@ import {
   type SceneGraph,
   type World,
 } from '@redux-xvr/layout'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   BASE_URL,
   type CatalogItem,
+  cachedCatalog,
   DEMO_REDUCTION,
   fetchBundleFor,
-  fetchCatalog,
   fixtureBundle,
+  resolveReduction,
 } from './api/redux.js'
 import { activeElement, useIntents } from './interaction.js'
+import { ControlPanel, panelHeight, panelWidth } from './scene/ControlPanel.js'
 import { Correspondences, type LinkDirection } from './scene/Correspondences.js'
 import { FormulaWorld } from './scene/FormulaWorld.js'
 import { GraphWorld } from './scene/GraphWorld.js'
@@ -32,6 +34,7 @@ const FRAME = params.get('frame')
 const WORLD = params.get('world') ?? 'both'
 const FOCUS = params.get('focus')
 const REDUCTION = params.get('reduction') ?? DEMO_REDUCTION
+const MENU_OPEN = params.get('menu') === 'open'
 
 /** Mirrors the switches Redux_GUI already exposes, plus the backward direction. */
 const MODES = {
@@ -113,6 +116,23 @@ function titleAnchor(world: World): [number, number, number] {
   ]
 }
 
+/** Below the worlds and toward the viewer, so the panel never sits inside them. */
+function panelAnchor(worlds: World[], open: boolean): [number, number, number] {
+  const xs = worlds.map((w) => w.origin[0] + w.bounds.max[0] * w.scale)
+  const xn = worlds.map((w) => w.origin[0] + w.bounds.min[0] * w.scale)
+  const ys = worlds.map((w) => w.origin[1] + w.bounds.min[1] * w.scale)
+  const zs = worlds.map((w) => w.origin[2] + w.bounds.max[2] * w.scale)
+  const cx = (Math.min(...xn) + Math.max(...xs)) / 2
+  return [cx, Math.min(...ys) - 2.4 - panelHeight(open) / 2, Math.max(...zs) + 0.8]
+}
+
+function panelCorners(worlds: World[], open: boolean) {
+  const [x, y, z] = panelAnchor(worlds, open)
+  const w = panelWidth(open) / 2
+  const h = panelHeight(open) / 2
+  return [[x - w, y - h, z] as const, [x + w, y + h, z] as const]
+}
+
 function worldSpacePositions(worlds: World[]) {
   return worlds.flatMap((w) => [
     ...w.nodes.map(
@@ -150,8 +170,15 @@ const unit = (v: V3): V3 => {
  * than the content — fitting the sphere leaves everything small. This also uses
  * the viewport aspect, so the horizontal budget is spent rather than wasted.
  */
-function frameCamera(worlds: World[], aspect: number) {
-  const points = worldSpacePositions(worlds)
+function frameCamera(worlds: World[], aspect: number, menuOpen: boolean) {
+  // The panel is scene geometry, so framing must account for it or it falls
+  // off-screen exactly when a student reaches for it. With the list open it is
+  // framed on its own: fitting a tall menu *and* the worlds shrinks both until
+  // the labels are unreadable, and while choosing a reduction the menu is the
+  // subject. The worlds stay visible above it.
+  const points = menuOpen
+    ? panelCorners(worlds, true)
+    : [...worldSpacePositions(worlds), ...panelCorners(worlds, false)]
   const axis = (i: number) => points.map((p) => p[i] as number)
   const mid = (v: number[]) => (Math.min(...v) + Math.max(...v)) / 2
   const center: V3 = [mid(axis(0)), mid(axis(1)), mid(axis(2))]
@@ -213,45 +240,61 @@ export function App() {
   const [status, setStatus] = useState<Status>({ state: 'loading' })
   const [mode, setMode] = useState<Mode>(INITIAL_MODE)
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
+  const [reduction, setReduction] = useState(REDUCTION)
+  const [menuOpen, setMenuOpen] = useState(MENU_OPEN)
+  const [busy, setBusy] = useState(false)
   const intents = useIntents(FOCUS)
 
+  const buildInto = useCallback((source: string, bundle: Parameters<typeof buildScene>[0]) => {
+    const frameIndex = FRAME === null ? undefined : Number(FRAME)
+    setStatus({ state: 'ready', scene: buildScene(bundle, { frameIndex }), source })
+  }, [])
+
+  // Catalog once: it describes what the backend offers, not what is on screen.
+  useEffect(() => {
+    if (USE_FIXTURES) return
+    let cancelled = false
+    cachedCatalog()
+      .then((items) => !cancelled && setCatalog(items))
+      .catch((err: Error) => console.warn(`catalog unavailable: ${err.message}`))
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Scene per selected reduction, refetched whenever the choice changes.
   useEffect(() => {
     let cancelled = false
 
-    const build = (source: string) => (bundle: Parameters<typeof buildScene>[0]) => {
-      if (cancelled) return
-      const frameIndex = FRAME === null ? undefined : Number(FRAME)
-      setStatus({ state: 'ready', scene: buildScene(bundle, { frameIndex }), source })
-    }
-
     if (USE_FIXTURES) {
-      build('fixtures')(fixtureBundle())
+      buildInto('fixtures', fixtureBundle())
       return () => {
         cancelled = true
       }
     }
 
-    fetchCatalog()
-      .then(async (items) => {
+    setBusy(true)
+    resolveReduction(reduction)
+      .then(async (chosen) => {
+        const bundle = await fetchBundleFor(chosen)
         if (cancelled) return
-        setCatalog(items)
-        const chosen = items.find((i) => i.className === REDUCTION) ?? items[0]
-        if (!chosen) throw new Error('catalog is empty')
-        if (chosen.capability.state === 'unsupported') {
-          throw new Error(`${chosen.className}: ${chosen.capability.reason}`)
-        }
-        build(`${chosen.source} → ${chosen.target} · ${BASE_URL}`)(await fetchBundleFor(chosen))
+        // Clear any pinned element: its ids belong to the previous reduction.
+        intents.clear()
+        buildInto(`${chosen.source} → ${chosen.target} · ${BASE_URL}`, bundle)
       })
       .catch((err: Error) => {
+        if (cancelled) return
         // Falling back rather than failing: a dead API should not blank the demo.
         console.warn(`live API failed (${err.message}); using fixtures`)
-        build(`fixtures — live API failed: ${err.message}`)(fixtureBundle())
+        buildInto(`fixtures — live API failed: ${err.message}`, fixtureBundle())
       })
+      .finally(() => !cancelled && setBusy(false))
 
     return () => {
       cancelled = true
     }
-  }, [])
+    // `intents` is stable by identity per selection; re-running on it would loop.
+  }, [reduction, buildInto])
 
   const scene = status.state === 'ready' ? status.scene : null
   const allSegments = useMemo(() => (scene ? resolveLinks(scene) : []), [scene])
@@ -269,10 +312,10 @@ export function App() {
   const shown = status.scene.worlds.filter((w) => WORLD === 'both' || w.id === WORLD)
   if (shown.length === 0) return <div className="hud">no world matches ?world={WORLD}</div>
 
-  const view = frameCamera(shown, window.innerWidth / window.innerHeight)
+  const linked = WORLD === 'both'
+  const view = frameCamera(shown, window.innerWidth / window.innerHeight, linked && menuOpen)
   const graph = shown.find((w) => w.kind === 'graph')
   const solutionCount = graph?.nodes.filter((n) => n.color === 'Solution').length ?? 0
-  const linked = WORLD === 'both'
   const available = (Object.keys(MODES) as Mode[]).filter(
     (m) => segmentsForMode(allSegments, m).length > 0,
   )
@@ -302,6 +345,27 @@ export function App() {
           emphasised={highlight}
           accent={effectiveMode === 'solution' ? edgeColor('Solution') : undefined}
         />
+        {linked && (
+          <ControlPanel
+            anchor={panelAnchor(shown, menuOpen)}
+            modes={(Object.keys(MODES) as Mode[]).map((m) => ({
+              key: m,
+              label: MODES[m].label,
+              count: segmentsForMode(allSegments, m).length,
+            }))}
+            activeMode={effectiveMode}
+            onMode={(m) => setMode(m as Mode)}
+            hint={`${MODES[effectiveMode].hint} · ${segments.length} link${
+              segments.length === 1 ? '' : 's'
+            }`}
+            catalog={catalog}
+            currentReduction={reduction}
+            onReduction={setReduction}
+            open={menuOpen}
+            onToggle={() => setMenuOpen((v) => !v)}
+            busy={busy}
+          />
+        )}
         <OrbitControls enableDamping={!STATIC} makeDefault target={view.center} />
         <ReadySignal />
       </Canvas>
@@ -332,39 +396,6 @@ export function App() {
           </div>
         )}
       </div>
-
-      {linked && (
-        <div className="controls">
-          <div className="row">
-            {(Object.keys(MODES) as Mode[]).map((m) => {
-              // A mode with nothing to draw is disabled rather than silently empty:
-              // most reductions publish no group-level gadgets at all.
-              const count = segmentsForMode(allSegments, m).length
-              return (
-                <button
-                  type="button"
-                  key={m}
-                  disabled={count === 0}
-                  title={count === 0 ? 'no correspondences of this kind published' : undefined}
-                  className={m === effectiveMode ? 'active' : ''}
-                  onClick={() => setMode(m)}
-                >
-                  {MODES[m].label}
-                </button>
-              )
-            })}
-          </div>
-          <div className="hint">
-            {MODES[effectiveMode].hint} · {segments.length} link
-            {segments.length === 1 ? '' : 's'}
-          </div>
-          <div className="hint dim">
-            {active
-              ? `${active} — click to ${intents.selected === active ? 'unpin' : 'pin'}`
-              : 'hover a literal or vertex to trace it'}
-          </div>
-        </div>
-      )}
     </>
   )
 }

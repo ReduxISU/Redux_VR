@@ -7,9 +7,11 @@ The existing D3 views render each problem flat and in isolation. This adds a **t
 spatial scene showing a reduction and the correspondence between its two sides. Flat in the browser
 first; VR is an upgrade on the same scene at the same URL.
 
-**Status:** slice 4a — any renderable reduction in the catalog can be shown, not just 3SAT → CLIQUE.
-The world builder dispatches on each side's representation family, so graph→graph and
-formula→formula reductions work with no new code. The in-scene menu and XR come next.
+**Status:** slice 4b — reductions are chosen from an in-scene menu, so switching works without
+leaving the view. All controls are scene geometry rather than DOM, because an immersive XR session
+has no HTML overlay: the same panel serves the flat browser and the headset. XR entry is next.
+
+![the in-scene reduction menu](docs/menu.png)
 
 ![the certificate mapping back to a satisfying assignment](docs/slice3.png)
 
@@ -39,7 +41,9 @@ by what it can actually support, so the view never implies more than the backend
 | **unlinked** | renders, but the backend publishes no gadgets | 4 |
 | **unsupported** | a side uses a family this renderer cannot draw (`Set D3`, `Dynamic Table`) | 9 |
 
-Switch with `?reduction=<className>`, e.g. `?reduction=sipserReductionVertexCover`.
+Pick one from the in-scene **Reductions** menu, or deep-link with `?reduction=<className>`.
+Unsupported entries are not listed at all — a dead control teaches nothing — but their count is
+reported. Modes with nothing to draw disable themselves and the view falls back to one that has links.
 
 ![CLIQUE to Vertex Cover, rendered with no reduction-specific code](docs/graph-to-graph.png)
 
@@ -84,6 +88,7 @@ playground/public/fonts/ Self-hosted font subset — see its NOTICE.md, the defa
 | `?reduction=<className>` | which reduction to show; default `SipserReduceToCliqueStandard` |
 | `?mode=reduction\|gadgets\|solution` | which correspondences to draw; default `reduction` |
 | `?focus=<id>` | pre-select an element, e.g. `?focus=x2_2` — deep-links a specific correspondence |
+| `?menu=open` | start with the reduction menu expanded |
 | `?world=from` / `?world=to` | show one world alone; default `both` |
 | `?source=fixtures` | render the committed capture instead of calling the API |
 | `?frame=0` | base (unsolved) frame; default is the solved frame |
@@ -106,6 +111,15 @@ convention.
 
 `npm run shoot` needs the dev server running. It waits on `window.__sceneReady` rather than a timer,
 and freezes animation by default so output is comparable between runs; pass `--live` to keep motion.
+
+Because the UI is scene geometry, it is exercised with real clicks rather than DOM queries:
+
+```bash
+npm run shoot menu-switch -- --url='http://localhost:5173/?menu=open' \
+  --click=450,280 --await-text='CLIQUE → VERTEXCOVER ·'
+```
+
+R3F raycasts that click exactly as it will raycast an XR controller ray.
 
 ## WebXR
 

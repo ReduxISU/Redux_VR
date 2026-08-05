@@ -144,4 +144,27 @@ export async function fetchBundleFor(item: CatalogItem): Promise<ReductionBundle
   }
 }
 
+/**
+ * Find a reduction in the catalog by class name, refetching the catalog if needed.
+ *
+ * Kept here rather than in the component so switching does not depend on the
+ * catalog having already loaded — the URL may name a reduction on first paint.
+ */
+let catalogCache: Promise<CatalogItem[]> | undefined
+
+export function cachedCatalog(): Promise<CatalogItem[]> {
+  catalogCache ??= fetchCatalog()
+  return catalogCache
+}
+
+export async function resolveReduction(className: string): Promise<CatalogItem> {
+  const items = await cachedCatalog()
+  const chosen = items.find((i) => i.className === className) ?? items[0]
+  if (!chosen) throw new Error('catalog is empty')
+  if (chosen.capability.state === 'unsupported') {
+    throw new Error(`${chosen.className}: ${chosen.capability.reason}`)
+  }
+  return chosen
+}
+
 export type { CatalogItem, ReductionEntry }
