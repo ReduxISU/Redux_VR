@@ -7,10 +7,11 @@ The existing D3 views render each problem flat and in isolation. This adds a **t
 spatial scene showing a reduction and the correspondence between its two sides. Flat in the browser
 first; VR is an upgrade on the same scene at the same URL.
 
-**Status:** slice 1 — 3SAT → CLIQUE renders in 3D from the live API. The reduced graph appears as
-three labelled clause hulls with the k-clique highlighted across them. No 3SAT world and no XR yet.
+**Status:** slice 2 — both sides of the 3SAT → CLIQUE reduction render from the live API. The
+formula appears as clause shelves, the reduced graph as three clause hulls with the k-clique spanning
+them. The two are not yet *linked* — gadget correspondences and XR come next.
 
-![the reduced clique](docs/slice1.png)
+![3SAT and the reduced clique](docs/slice2.png)
 
 ## Quick start
 
@@ -33,12 +34,16 @@ fixtures/                Committed API capture — deterministic tests, works of
 docs/data-contract.md    What the backend actually emits, and its quirks.
 tools/capture-fixtures.ts Refresh fixtures from the live API.
 tools/shoot.ts           Headless screenshots (SwiftShader) for visual verification.
+
+playground/public/fonts/ Self-hosted font subset — see its NOTICE.md, the default
+                         drei font has no math glyphs.
 ```
 
 ### URL parameters
 
 | Param | Effect |
 |---|---|
+| `?world=from` / `?world=to` | show one world alone; default `both` |
 | `?source=fixtures` | render the committed capture instead of calling the API |
 | `?frame=0` | base (unsolved) frame; default is the solved frame |
 | `?static=1` | freeze animation and damping, for comparable screenshots |

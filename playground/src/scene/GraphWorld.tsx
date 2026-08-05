@@ -2,6 +2,7 @@ import { Billboard, Instance, Instances, Text } from '@react-three/drei'
 import { edgeColor, nodeColor, type World } from '@redux-xvr/layout'
 import { useMemo } from 'react'
 import { BufferAttribute, BufferGeometry, Color } from 'three'
+import { FONT_URL } from './typography.js'
 
 const VERTEX_RADIUS = 0.17
 const SOLUTION_SCALE = 1.45
@@ -91,6 +92,7 @@ function Labels({ world }: { world: World }) {
           position={[node.position[0], node.position[1] + 0.36, node.position[2]]}
         >
           <Text
+            font={FONT_URL}
             fontSize={LABEL_SIZE}
             color={node.color === 'Solution' ? '#eafff2' : '#c6d2e2'}
             anchorX="center"
@@ -144,6 +146,7 @@ function GroupHulls({ world }: { world: World }) {
             </mesh>
             <Billboard position={[center[0], center[1] - r - 0.3, center[2]]}>
               <Text
+                font={FONT_URL}
                 fontSize={0.22}
                 color={tint}
                 anchorX="center"
@@ -163,7 +166,7 @@ function GroupHulls({ world }: { world: World }) {
 
 export function GraphWorld({ world }: { world: World }) {
   return (
-    <group position={world.origin as unknown as [number, number, number]}>
+    <group position={world.origin as unknown as [number, number, number]} scale={world.scale}>
       <GroupHulls world={world} />
       <Edges world={world} />
       <Vertices world={world} />

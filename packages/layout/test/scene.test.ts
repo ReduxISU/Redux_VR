@@ -78,7 +78,8 @@ describe('resolveGroups', () => {
 
 describe('buildScene', () => {
   const scene = buildScene(bundle)
-  const world = scene.worlds[0]
+  // Select by id: the scene grew a second world, and index order is not the contract.
+  const world = scene.worlds.find((w) => w.id === 'to')
 
   it('produces one graph world with every vertex placed', () => {
     expect(world?.kind).toBe('graph')
@@ -120,13 +121,14 @@ describe('buildScene', () => {
   it('renders the base frame when asked', () => {
     const base = buildScene(bundle, { frameIndex: 0 })
     expect(base.frameIndex).toBe(0)
-    expect(base.worlds[0]?.nodes.every((n) => n.color === '')).toBe(true)
+    const graph = base.worlds.find((w) => w.id === 'to')
+    expect(graph?.nodes.every((n) => n.color === '')).toBe(true)
   })
 
   it('is deterministic — identical positions across runs', () => {
-    const a = JSON.stringify(buildScene(bundle).worlds[0]?.nodes)
-    const b = JSON.stringify(buildScene(bundle).worlds[0]?.nodes)
-    expect(a).toBe(b)
+    const nodes = (s: ReturnType<typeof buildScene>) =>
+      JSON.stringify(s.worlds.find((w) => w.id === 'to')?.nodes)
+    expect(nodes(buildScene(bundle))).toBe(nodes(buildScene(bundle)))
   })
 
   it('matches the position snapshot', () => {

@@ -1,6 +1,8 @@
 import { boundingRadius, boundsOf, centroid, layoutClusters } from './clique.js'
 import { dedupeLinks, resolveGroups } from './parse.js'
+import { layoutFormula } from './sat3.js'
 import type {
+  ApiFormulaFrame,
   ApiGraphFrame,
   CorrespondenceLink,
   ReductionBundle,
@@ -15,10 +17,15 @@ import type {
 export interface BuildOptions {
   /** Which visualization frame to render. 0 = base, last = solved. */
   frameIndex?: number
-  origin?: Vec3
+  /** Empty space between the two worlds. */
+  worldGap?: number
+  /** Target width of the source world as a fraction of the target world's. */
+  sourceWidthFraction?: number
 }
 
-function graphWorld(frame: ApiGraphFrame, bundle: ReductionBundle, origin: Vec3): World {
+const ORIGIN: Vec3 = [0, 0, 0]
+
+function graphWorld(frame: ApiGraphFrame, bundle: ReductionBundle): World {
   const groups = resolveGroups(frame.nodes, bundle.gadgets)
   const { positions, frames } = layoutClusters(groups)
 
@@ -30,7 +37,7 @@ function graphWorld(frame: ApiGraphFrame, bundle: ReductionBundle, origin: Vec3)
   const nodes: SceneNode[] = frame.nodes.map((n) => ({
     id: n.id,
     label: n.name,
-    position: positions.get(n.id) ?? [0, 0, 0],
+    position: positions.get(n.id) ?? ORIGIN,
     color: n.color,
     group: nodeGroup.get(n.id),
   }))
@@ -47,7 +54,7 @@ function graphWorld(frame: ApiGraphFrame, bundle: ReductionBundle, origin: Vec3)
     }))
 
   const sceneGroups: SceneGroup[] = [...groups].map(([id, members]) => {
-    const points = members.map((m) => positions.get(m) ?? ([0, 0, 0] as Vec3))
+    const points = members.map((m) => positions.get(m) ?? ORIGIN)
     const center = centroid(points)
     return {
       id,
@@ -60,16 +67,86 @@ function graphWorld(frame: ApiGraphFrame, bundle: ReductionBundle, origin: Vec3)
     }
   })
 
+  // Group hulls are drawn around their members, so bounds must cover them too or
+  // the world will overlap its neighbour by the hull radius.
+  const extremes = sceneGroups.flatMap((g) => [
+    [g.centroid[0] - g.radius, g.centroid[1] - g.radius, g.centroid[2] - g.radius] as Vec3,
+    [g.centroid[0] + g.radius, g.centroid[1] + g.radius, g.centroid[2] + g.radius] as Vec3,
+  ])
+
   return {
     id: 'to',
     kind: 'graph',
     problemName: bundle.reduction.reductionTo.problemName,
-    origin,
+    origin: ORIGIN,
+    scale: 1,
     nodes,
     edges,
     groups: sceneGroups,
-    bounds: boundsOf(nodes.map((n) => n.position)),
+    bounds: boundsOf([...nodes.map((n) => n.position), ...extremes]),
   }
+}
+
+function formulaWorld(frame: ApiFormulaFrame, bundle: ReductionBundle): World {
+  const { positions, shelves } = layoutFormula(frame.clauses)
+
+  const nodes: SceneNode[] = frame.clauses.flatMap((clause) =>
+    clause.literals.map((literal) => ({
+      id: literal.id,
+      label: literal.literal,
+      position: positions.get(literal.id) ?? ORIGIN,
+      color: literal.color,
+      group: clause.id,
+    })),
+  )
+
+  // A formula has no edges — adjacency is expressed by shelf membership.
+  const groups: SceneGroup[] = frame.clauses.map((clause) => {
+    const shelf = shelves.get(clause.id)
+    return {
+      id: clause.id,
+      label: clause.id,
+      members: clause.literals.map((l) => l.id),
+      centroid: shelf?.center ?? ORIGIN,
+      normal: [0, 0, 1] as Vec3,
+      radius: shelf?.halfWidth ?? 1,
+      color: 'ClauseHighlight',
+    }
+  })
+
+  const extremes = groups.flatMap((g) => [
+    [g.centroid[0] - g.radius, g.centroid[1] - 0.4, 0] as Vec3,
+    [g.centroid[0] + g.radius, g.centroid[1] + 0.4, 0] as Vec3,
+  ])
+
+  return {
+    id: 'from',
+    kind: 'formula',
+    problemName: bundle.reduction.reductionFrom.problemName,
+    origin: ORIGIN,
+    scale: 1,
+    nodes,
+    edges: [],
+    groups,
+    bounds: boundsOf([...nodes.map((n) => n.position), ...extremes]),
+  }
+}
+
+const width = (w: World) => (w.bounds.max[0] - w.bounds.min[0]) * w.scale
+
+/** Enlarge the compact symbolic world so it carries comparable visual weight to
+ *  the graph — otherwise the formula reads as a caption rather than a peer. */
+function matchVisualWeight(from: World, to: World, fraction: number): void {
+  const natural = from.bounds.max[0] - from.bounds.min[0]
+  if (natural <= 0) return
+  from.scale = Math.min(Math.max((width(to) * fraction) / natural, 1), 4)
+}
+
+/** Push the two worlds apart along x so neither overlaps the gap between them. */
+function placeSideBySide(from: World, to: World, gap: number): void {
+  const half = gap / 2
+  from.origin = [-half - from.bounds.max[0] * from.scale, 0, 0]
+  to.origin = [half - to.bounds.min[0] * to.scale, 0, 0]
 }
 
 /** Gadgets, carried through verbatim — the wire between the two worlds. */
@@ -82,6 +159,10 @@ function correspondences(bundle: ReductionBundle): CorrespondenceLink[] {
   }))
 }
 
+function clampIndex(requested: number, count: number): number {
+  return Math.min(Math.max(requested, 0), Math.max(count - 1, 0))
+}
+
 /**
  * Reduction JSON -> positioned scene. Pure and deterministic: the same bundle
  * always produces byte-identical positions, so CI can snapshot them.
@@ -89,13 +170,29 @@ function correspondences(bundle: ReductionBundle): CorrespondenceLink[] {
 export function buildScene(bundle: ReductionBundle, options: BuildOptions = {}): SceneGraph {
   const frameCount = bundle.toFrames.length
   const requested = options.frameIndex ?? frameCount - 1
-  const frameIndex = Math.min(Math.max(requested, 0), Math.max(frameCount - 1, 0))
-  const frame = bundle.toFrames[frameIndex]
-  if (!frame) throw new Error('reduction bundle has no visualization frames')
+  const frameIndex = clampIndex(requested, frameCount)
+
+  const toFrame = bundle.toFrames[frameIndex]
+  if (!toFrame) throw new Error('reduction bundle has no target visualization frames')
+
+  // The two problems are visualized independently and need not have the same
+  // number of frames, so the source index is clamped on its own.
+  const fromFrame = bundle.fromFrames[clampIndex(requested, bundle.fromFrames.length)]
+
+  const to = graphWorld(toFrame, bundle)
+  const worlds: World[] = []
+
+  if (fromFrame) {
+    const from = formulaWorld(fromFrame, bundle)
+    matchVisualWeight(from, to, options.sourceWidthFraction ?? 0.62)
+    placeSideBySide(from, to, options.worldGap ?? 4.5)
+    worlds.push(from)
+  }
+  worlds.push(to)
 
   return {
     reductionName: bundle.reduction.reductionName,
-    worlds: [graphWorld(frame, bundle, options.origin ?? [0, 0, 0])],
+    worlds,
     links: correspondences(bundle),
     frameIndex,
     frameCount,

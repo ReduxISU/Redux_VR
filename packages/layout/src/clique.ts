@@ -48,8 +48,11 @@ const SEPARATION = 3.6
 /** Group anchors: a ring for a few groups, a sphere for many. */
 function anchorPositions(count: number, radius: number): Vec3[] {
   if (count > RING_MAX_GROUPS) return fibonacciSphere(count, radius)
+  // Quarter-turn phase so the first group sits front-centre rather than off to one
+  // side: from a default front view that spreads the rest left and right instead of
+  // stacking two of them along the line of sight.
   return Array.from({ length: count }, (_, i) => {
-    const theta = (2 * Math.PI * i) / count
+    const theta = (2 * Math.PI * i) / count + Math.PI / 2
     return [Math.cos(theta) * radius, 0, Math.sin(theta) * radius] as Vec3
   })
 }

@@ -124,9 +124,13 @@ export interface World {
   kind: WorldKind
   problemName: string
   origin: Vec3
+  /** Uniform scale applied by the renderer. Lets a compact symbolic world sit
+   *  alongside a sprawling spatial one without either dominating. */
+  scale: number
   nodes: SceneNode[]
   edges: SceneEdge[]
   groups: SceneGroup[]
+  /** Encloses everything drawn, groups included — not just node positions. */
   bounds: { min: Vec3; max: Vec3 }
 }
 
