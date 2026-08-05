@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "paths": {
+      "@redux-xvr/layout": ["../packages/layout/src/index.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}

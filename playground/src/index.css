@@ -1,0 +1,40 @@
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: #12151a;
+  color: #e7ecf3;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+canvas {
+  display: block;
+  touch-action: none;
+}
+
+.hud {
+  position: fixed;
+  top: 12px;
+  left: 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.hud strong {
+  font-weight: 600;
+}
+
+.hud .dim {
+  opacity: 0.6;
+}

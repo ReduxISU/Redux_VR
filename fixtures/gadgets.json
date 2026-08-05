@@ -1,0 +1,116 @@
+[
+  {
+    "color": "ElementHighlight",
+    "reductionFromIds": [
+      "0-0"
+    ],
+    "reductionToIds": [
+      "x1_0"
+    ]
+  },
+  {
+    "color": "ElementHighlight",
+    "reductionFromIds": [
+      "0-1"
+    ],
+    "reductionToIds": [
+      "!x2_0"
+    ]
+  },
+  {
+    "color": "ElementHighlight",
+    "reductionFromIds": [
+      "0-2"
+    ],
+    "reductionToIds": [
+      "x3_0"
+    ]
+  },
+  {
+    "color": "ClauseHighlight",
+    "reductionFromIds": [
+      "0"
+    ],
+    "reductionToIds": [
+      "x1_0",
+      "!x2_0",
+      "x3_0"
+    ]
+  },
+  {
+    "color": "ElementHighlight",
+    "reductionFromIds": [
+      "1-0"
+    ],
+    "reductionToIds": [
+      "!x1_1"
+    ]
+  },
+  {
+    "color": "ElementHighlight",
+    "reductionFromIds": [
+      "1-1"
+    ],
+    "reductionToIds": [
+      "x3_1"
+    ]
+  },
+  {
+    "color": "ElementHighlight",
+    "reductionFromIds": [
+      "1-2"
+    ],
+    "reductionToIds": [
+      "x1_1"
+    ]
+  },
+  {
+    "color": "ClauseHighlight",
+    "reductionFromIds": [
+      "1"
+    ],
+    "reductionToIds": [
+      "!x1_1",
+      "x3_1",
+      "x1_1"
+    ]
+  },
+  {
+    "color": "ElementHighlight",
+    "reductionFromIds": [
+      "2-0"
+    ],
+    "reductionToIds": [
+      "x2_2"
+    ]
+  },
+  {
+    "color": "ElementHighlight",
+    "reductionFromIds": [
+      "2-1"
+    ],
+    "reductionToIds": [
+      "!x3_2"
+    ]
+  },
+  {
+    "color": "ElementHighlight",
+    "reductionFromIds": [
+      "2-2"
+    ],
+    "reductionToIds": [
+      "!x1_2"
+    ]
+  },
+  {
+    "color": "ClauseHighlight",
+    "reductionFromIds": [
+      "2"
+    ],
+    "reductionToIds": [
+      "x2_2",
+      "!x3_2",
+      "!x1_2"
+    ]
+  }
+]
