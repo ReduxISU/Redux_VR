@@ -5,7 +5,7 @@
  * `∧`, `¬` and the rest render as nothing — with no error and no warning. See
  * public/fonts/NOTICE.md.
  */
-export const FONT_URL = '/fonts/redux-xvr.ttf'
+export const FONT_URL = '/fonts/redux-vr.ttf'
 
 /** Dark outline behind glyphs, so labels stay readable against any geometry. */
 export const TEXT_OUTLINE = {

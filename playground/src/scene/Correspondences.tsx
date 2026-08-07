@@ -1,5 +1,5 @@
 import { Line } from '@react-three/drei'
-import { edgeColor, type LinkSegment } from '@redux-xvr/layout'
+import { edgeColor, type LinkSegment } from '@redux-vr/layout'
 import { useMemo } from 'react'
 import { QuadraticBezierCurve3, Quaternion, Vector3 } from 'three'
 

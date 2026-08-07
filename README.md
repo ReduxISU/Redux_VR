@@ -1,4 +1,4 @@
-# Redux XVR
+# Redux VR
 
 A 3D / WebXR visualization layer for [Redux](https://github.com/ReduxISU) — the ISU platform for
 teaching NP-completeness and polynomial-time mapping reductions.

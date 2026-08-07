@@ -1,5 +1,5 @@
 import { Billboard, Instance, Instances, Text } from '@react-three/drei'
-import { edgeColor, nodeColor, type World } from '@redux-xvr/layout'
+import { edgeColor, nodeColor, type World } from '@redux-vr/layout'
 import { useMemo } from 'react'
 import { BufferAttribute, BufferGeometry, Color } from 'three'
 import { elementHandlers, type Intents } from '../interaction.js'

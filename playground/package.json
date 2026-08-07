@@ -1,5 +1,5 @@
 {
-  "name": "@redux-xvr/playground",
+  "name": "@redux-vr/playground",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.7.0",
     "@react-three/xr": "^6.6.30",
-    "@redux-xvr/layout": "*",
+    "@redux-vr/layout": "*",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "three": "^0.185.1"

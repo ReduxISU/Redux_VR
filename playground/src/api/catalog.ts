@@ -1,4 +1,4 @@
-import type { WorldKind } from '@redux-xvr/layout'
+import type { WorldKind } from '@redux-vr/layout'
 
 export interface ReductionEntry {
   className: string

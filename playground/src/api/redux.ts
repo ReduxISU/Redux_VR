@@ -1,4 +1,4 @@
-import type { AnyFrame, ApiReduction, Gadget, ReductionBundle } from '@redux-xvr/layout'
+import type { AnyFrame, ApiReduction, Gadget, ReductionBundle } from '@redux-vr/layout'
 import cliqueFrames from '../../../fixtures/clique-frames.json'
 import gadgets from '../../../fixtures/gadgets.json'
 import meta from '../../../fixtures/meta.json'

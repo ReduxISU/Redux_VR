@@ -10,7 +10,7 @@ import {
   resolveLinks,
   type SceneGraph,
   type World,
-} from '@redux-xvr/layout'
+} from '@redux-vr/layout'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   BASE_URL,

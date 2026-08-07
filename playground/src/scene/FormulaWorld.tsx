@@ -1,5 +1,5 @@
 import { Text } from '@react-three/drei'
-import { nodeColor } from '@redux-xvr/layout'
+import { nodeColor } from '@redux-vr/layout'
 import { DoubleSide } from 'three'
 import { elementHandlers } from '../interaction.js'
 import type { WorldViewProps } from './GraphWorld.js'

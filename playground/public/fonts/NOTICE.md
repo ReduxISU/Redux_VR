@@ -1,4 +1,4 @@
-# redux-xvr.ttf
+# redux-vr.ttf
 
 A subset of **DejaVu Sans** (Book), generated with `pyftsubset` from
 `/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf`.
@@ -22,7 +22,7 @@ Regenerate with:
 
 ```bash
 pyftsubset /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf \
-  --output-file=playground/public/fonts/redux-xvr.ttf \
+  --output-file=playground/public/fonts/redux-vr.ttf \
   --unicodes="U+0020-007E,U+00AC,U+00B7,U+00D7,U+2032,U+2190-2193,U+2200-2209,U+2227-222A,U+2260-2264,U+2282-2287,U+22C0-22C3,U+2205,U+03A6,U+03C6,U+2026,U+25A0-25FF,U+2022,U+00B0" \
   --layout-features='*' --no-hinting --desubroutinize
 ```
