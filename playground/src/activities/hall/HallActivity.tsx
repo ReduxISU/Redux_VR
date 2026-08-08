@@ -9,6 +9,7 @@ import { Hud } from '../../shell/hud.js'
 import { PARAMS } from '../../shell/params.js'
 import { Stage } from '../../shell/Stage.js'
 import { BinPackingDiorama } from './BinPackingDiorama.js'
+import { ColoringDiorama } from './ColoringDiorama.js'
 import { ReductionDiorama } from './ReductionDiorama.js'
 
 /**
@@ -58,6 +59,7 @@ const WING_LABEL: Record<string, string> = {
 
 function Diorama({ id, size }: { id: string; size: number }) {
   if (id === 'binpacking') return <BinPackingDiorama size={size} />
+  if (id === 'graphcoloring') return <ColoringDiorama size={size} />
   if (id === 'reduction') return <ReductionDiorama size={size} />
   return null
 }

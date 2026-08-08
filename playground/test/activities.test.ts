@@ -10,7 +10,11 @@ describe('resolveActivityId', () => {
   })
 
   it('falls back on an unknown id rather than rendering nothing', () => {
-    expect(resolveActivityId('graphcoloring')).toBe(DEFAULT_ACTIVITY)
+    // Guarded, because this test has twice been written against an id that was
+    // merely planned at the time and later got built.
+    const nonsense = 'nosuchproblem'
+    expect(ACTIVITIES).not.toHaveProperty(nonsense)
+    expect(resolveActivityId(nonsense)).toBe(DEFAULT_ACTIVITY)
   })
 
   it('returns every built id unchanged', () => {

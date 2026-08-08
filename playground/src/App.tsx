@@ -1,5 +1,6 @@
 import { type ComponentType, useCallback, useState } from 'react'
 import { BinPackingActivity } from './activities/binpacking/BinPackingActivity.js'
+import { ColoringActivity } from './activities/coloring/ColoringActivity.js'
 import { HallActivity } from './activities/hall/HallActivity.js'
 import { ReductionActivity } from './activities/reduction/ReductionActivity.js'
 import { resolveActivityId } from './shell/activities.js'
@@ -22,6 +23,7 @@ export interface ActivityProps {
 const VIEWS: Record<string, ComponentType<ActivityProps>> = {
   hall: HallActivity,
   binpacking: BinPackingActivity,
+  graphcoloring: ColoringActivity,
   reduction: ReductionActivity,
 }
 

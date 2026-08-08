@@ -48,7 +48,7 @@ export const ACTIVITIES: Record<string, ActivityMeta> = {
     title: 'Graph Coloring',
     wing: 'k12',
     blurb: 'Colour the map so no two neighbours match',
-    status: 'planned',
+    status: 'ready',
   },
   tsp: {
     id: 'tsp',
