@@ -27,8 +27,9 @@ import { FormulaWorld } from '../../scene/FormulaWorld.js'
 import { GraphWorld } from '../../scene/GraphWorld.js'
 import { FONT_URL } from '../../scene/typography.js'
 import { fitCamera, type V3 } from '../../shell/framing.js'
+import { Hud } from '../../shell/hud.js'
 import { PARAMS } from '../../shell/params.js'
-import { SceneShell } from '../../shell/SceneShell.js'
+import { Stage } from '../../shell/Stage.js'
 
 /** Mirrors the switches Redux_GUI already exposes, plus the backward direction. */
 const MODES = {
@@ -225,11 +226,16 @@ export function ReductionActivity({ onNavigate }: ActivityProps) {
     return set
   }, [scene, active])
 
-  if (status.state === 'loading') return <div className="hud">loading reduction…</div>
-  if (status.state === 'error') return <div className="hud">error: {status.message}</div>
+  const notice = (text: string) => (
+    <Hud.In>
+      <div className="hud">{text}</div>
+    </Hud.In>
+  )
+  if (status.state === 'loading') return notice('loading reduction…')
+  if (status.state === 'error') return notice(`error: ${status.message}`)
 
   const shown = status.scene.worlds.filter((w) => PARAMS.world === 'both' || w.id === PARAMS.world)
-  if (shown.length === 0) return <div className="hud">no world matches ?world={PARAMS.world}</div>
+  if (shown.length === 0) return notice(`no world matches ?world=${PARAMS.world}`)
 
   const linked = PARAMS.world === 'both'
   const view = frameCamera(shown, window.innerWidth / window.innerHeight, linked && menuOpen)
@@ -243,12 +249,7 @@ export function ReductionActivity({ onNavigate }: ActivityProps) {
 
   return (
     <>
-      <SceneShell
-        camera={{ position: view.position, fov: FOV }}
-        extent={view.extent}
-        target={view.center}
-        damping={!PARAMS.static}
-      >
+      <Stage view={view} fov={FOV} damping={!PARAMS.static}>
         {shown.map((world) => (
           <group key={world.id}>
             {world.kind === 'formula' ? (
@@ -288,34 +289,36 @@ export function ReductionActivity({ onNavigate }: ActivityProps) {
             onExit={() => onNavigate('hall')}
           />
         )}
-      </SceneShell>
+      </Stage>
 
-      <div className="hud">
-        <div>
-          <strong>{status.scene.reductionName}</strong>
-        </div>
-        {shown.map((world) => (
-          <div className="dim" key={world.id}>
-            {world.problemName} ({world.kind}) · {world.nodes.length}{' '}
-            {world.kind === 'formula' ? 'literals' : 'vertices'}
-            {world.edges.length > 0 ? ` · ${world.edges.length} edges` : ''} · {world.groups.length}{' '}
-            clauses
+      <Hud.In>
+        <div className="hud">
+          <div>
+            <strong>{status.scene.reductionName}</strong>
           </div>
-        ))}
-        <div className="dim">
-          frame {status.scene.frameIndex + 1}/{status.scene.frameCount}
-          {solutionCount > 0 ? ` · ${solutionCount}-clique highlighted` : ''} ·{' '}
-          {status.scene.links.length} gadgets
-        </div>
-        <div className="dim">{status.source}</div>
-        {catalog.length > 0 && (
+          {shown.map((world) => (
+            <div className="dim" key={world.id}>
+              {world.problemName} ({world.kind}) · {world.nodes.length}{' '}
+              {world.kind === 'formula' ? 'literals' : 'vertices'}
+              {world.edges.length > 0 ? ` · ${world.edges.length} edges` : ''} ·{' '}
+              {world.groups.length} clauses
+            </div>
+          ))}
           <div className="dim">
-            catalog: {catalog.filter((c) => c.capability.state === 'linked').length} linked ·{' '}
-            {catalog.filter((c) => c.capability.state === 'unlinked').length} unlinked ·{' '}
-            {catalog.filter((c) => c.capability.state === 'unsupported').length} unsupported
+            frame {status.scene.frameIndex + 1}/{status.scene.frameCount}
+            {solutionCount > 0 ? ` · ${solutionCount}-clique highlighted` : ''} ·{' '}
+            {status.scene.links.length} gadgets
           </div>
-        )}
-      </div>
+          <div className="dim">{status.source}</div>
+          {catalog.length > 0 && (
+            <div className="dim">
+              catalog: {catalog.filter((c) => c.capability.state === 'linked').length} linked ·{' '}
+              {catalog.filter((c) => c.capability.state === 'unlinked').length} unlinked ·{' '}
+              {catalog.filter((c) => c.capability.state === 'unsupported').length} unsupported
+            </div>
+          )}
+        </div>
+      </Hud.In>
     </>
   )
 }

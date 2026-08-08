@@ -1,12 +1,13 @@
-import { type ComponentType, useCallback } from 'react'
+import { type ComponentType, useCallback, useState } from 'react'
 import { BinPackingActivity } from './activities/binpacking/BinPackingActivity.js'
 import { HallActivity } from './activities/hall/HallActivity.js'
 import { ReductionActivity } from './activities/reduction/ReductionActivity.js'
 import { resolveActivityId } from './shell/activities.js'
 import { PARAMS } from './shell/params.js'
+import { SceneShell } from './shell/SceneShell.js'
 
 /**
- * The dispatcher: pick an activity, render it.
+ * The dispatcher: pick an activity, render it into the shared canvas.
  *
  * This is the only module that knows activities have components — the registry
  * in `shell/activities.ts` stays metadata so the hall can list scenes it is not
@@ -30,29 +31,34 @@ if (PARAMS.activity && PARAMS.activity !== INITIAL) {
   console.warn(`unknown or unbuilt ?activity=${PARAMS.activity} — showing ${INITIAL}`)
 }
 
-/**
- * Changing rooms loads a new URL.
- *
- * Swapping the activity in React state would be faster, but every activity
- * mounts its own `SceneShell`, so switching types tears the `<Canvas>` down and
- * builds a new one anyway — and an in-scene click never lands again afterwards,
- * presumably because the pointer system is still holding a mesh that unmounted
- * mid-event. A real reload is at least a path that is exercised constantly.
- *
- * The prize for fixing this properly is XR: an immersive session cannot survive
- * either a reload *or* a new WebGL context, so changing rooms in a headset will
- * always drop the student back to the page until one `<Canvas>` spans the whole
- * app. That needs the HUD to cross from R3F's reconciler back to the DOM — a
- * tunnel, not a `react-dom` portal — which is a piece of work in its own right,
- * and worth doing before anyone tries this on hardware.
- */
 export function App() {
+  const [activity, setActivity] = useState(INITIAL)
+
+  /**
+   * Swapped in place. The canvas belongs to the shell above, so changing rooms
+   * keeps the WebGL context — and with it any immersive session, which cannot
+   * survive either a reload or a new context.
+   *
+   * That placement is also what makes the scene stay clickable. While each
+   * activity mounted its own canvas, one switch left every later in-scene click
+   * dead; measured, and the fix was the shared canvas, not deferring the state
+   * change out of the click that caused it.
+   *
+   * `pushState` keeps the address bar honest, so a link to one activity still
+   * works and a printed instance still opens the puzzle it names.
+   */
   const navigate = useCallback((id: string) => {
+    const next = resolveActivityId(id)
     const url = new URL(window.location.href)
-    url.searchParams.set('activity', resolveActivityId(id))
-    window.location.assign(url.toString())
+    url.searchParams.set('activity', next)
+    window.history.pushState({ activity: next }, '', url)
+    setActivity(next)
   }, [])
 
-  const View = VIEWS[INITIAL] ?? HallActivity
-  return <View onNavigate={navigate} />
+  const View = VIEWS[activity] ?? HallActivity
+  return (
+    <SceneShell>
+      <View onNavigate={navigate} />
+    </SceneShell>
+  )
 }

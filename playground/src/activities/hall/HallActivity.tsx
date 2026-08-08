@@ -5,8 +5,9 @@ import type { ActivityProps } from '../../App.js'
 import { FONT_URL } from '../../scene/typography.js'
 import { type ActivityMeta, shelf } from '../../shell/activities.js'
 import { boxCorners, fitCamera, type V3 } from '../../shell/framing.js'
+import { Hud } from '../../shell/hud.js'
 import { PARAMS } from '../../shell/params.js'
-import { SceneShell } from '../../shell/SceneShell.js'
+import { Stage } from '../../shell/Stage.js'
 import { BinPackingDiorama } from './BinPackingDiorama.js'
 import { ReductionDiorama } from './ReductionDiorama.js'
 
@@ -186,12 +187,7 @@ export function HallActivity({ onNavigate }: ActivityProps) {
 
   return (
     <>
-      <SceneShell
-        camera={{ position: view.position, fov: FOV }}
-        extent={view.extent}
-        target={view.center}
-        damping={!PARAMS.static}
-      >
+      <Stage view={view} fov={FOV} damping={!PARAMS.static}>
         {exhibits.map((meta, i) => (
           <Plinth key={meta.id} meta={meta} spot={spot(i)} onOpen={() => onNavigate(meta.id)} />
         ))}
@@ -220,18 +216,20 @@ export function HallActivity({ onNavigate }: ActivityProps) {
             </Text>
           )
         })}
-      </SceneShell>
+      </Stage>
 
-      <div className="hud">
-        <div>
-          <strong>Redux</strong>
+      <Hud.In>
+        <div className="hud">
+          <div>
+            <strong>Redux</strong>
+          </div>
+          <div className="dim">pick a problem</div>
+          <div className="dim">
+            {exhibits.filter((e) => e.status === 'ready').length} of {exhibits.length} built
+          </div>
+          <div className="dim">{exhibits.map((e) => e.title).join(' · ')}</div>
         </div>
-        <div className="dim">pick a problem</div>
-        <div className="dim">
-          {exhibits.filter((e) => e.status === 'ready').length} of {exhibits.length} built
-        </div>
-        <div className="dim">{exhibits.map((e) => e.title).join(' · ')}</div>
-      </div>
+      </Hud.In>
     </>
   )
 }

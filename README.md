@@ -71,7 +71,13 @@ The dev server binds `0.0.0.0`, so under WSL2 it is reachable from a Windows bro
 ```
 packages/layout/         PURE. Reduction JSON -> positions. No three.js, no React, no DOM.
                          Unit-tested in CI, no GPU required.
-playground/              Vite + React Three Fiber. Consumes layout output.
+packages/puzzle/         PURE. Bin-packing instance -> items, placement, certificate,
+                         positions. Same fence, same guarantee.
+playground/
+  shell/                 One <Canvas> for the app; per-activity Stage; activity registry.
+  activities/hall/       The shelf of problems — the front door.
+  activities/binpacking/ Grab-and-place bin packing.
+  activities/reduction/  The two-world reduction view.
 fixtures/                Committed API capture — deterministic tests, works offline.
 docs/data-contract.md    What the backend actually emits, and its quirks.
 tools/capture-fixtures.ts Refresh fixtures from the live API.
@@ -81,10 +87,18 @@ playground/public/fonts/ Self-hosted font subset — see its NOTICE.md, the defa
                          drei font has no math glyphs.
 ```
 
+The canvas is mounted once, above the activity switch: a WebGL context cannot be handed to a new
+one, so a per-activity canvas would end any immersive session every time a student changed rooms.
+Activities therefore render *inside* the canvas and publish their DOM readout back out through a
+tunnel (`shell/tunnel.ts`) — `react-dom`'s `createPortal` cannot cross between the two reconcilers.
+
 ### URL parameters
 
 | Param | Effect |
 |---|---|
+| `?activity=hall\|binpacking\|reduction` | which scene to open; default `hall` |
+| `?instance=<string>` | the problem instance, in the backend's own syntax — e.g. `((4,7,3,6,2,8),10,3)`. Lets a printed kit or worksheet carry the exact puzzle a class is working on |
+| `?skin=trucks\|hawaii` | which telling of a puzzle to open in; presentation only, never the puzzle |
 | `?reduction=<className>` | which reduction to show; default `SipserReduceToCliqueStandard` |
 | `?mode=reduction\|gadgets\|solution` | which correspondences to draw; default `reduction` |
 | `?focus=<id>` | pre-select an element, e.g. `?focus=x2_2` — deep-links a specific correspondence |
@@ -115,11 +129,27 @@ and freezes animation by default so output is comparable between runs; pass `--l
 Because the UI is scene geometry, it is exercised with real clicks rather than DOM queries:
 
 ```bash
-npm run shoot menu-switch -- --url='http://localhost:5173/?menu=open' \
+npm run shoot menu-switch -- --url='http://localhost:5173/?activity=reduction&menu=open' \
   --click=450,280 --await-text='CLIQUE → VERTEXCOVER ·'
 ```
 
 R3F raycasts that click exactly as it will raycast an XR controller ray.
+
+`--click`, `--drag=x1,y1,x2,y2` and `--await-text` all repeat and run **in the order given**, so a
+whole session scripts against facts rather than timers — including a click that turns out to be a
+navigation:
+
+```bash
+npm run shoot packed -- --url='http://localhost:5173/?activity=binpacking' \
+  --click=640,611 --await-text='0 to place' \
+  --click=460,611 --await-text='referee: True'
+```
+
+Two cautions. `window.__sceneReady` now means *the canvas has painted*, which for an activity that
+fetches its data is before that data arrives — assert anything data-driven with `--await-text`
+against the HUD. And troika rebuilds in-scene `<Text>` off the main thread, so a screenshot can catch
+a freshly-coloured label still showing stale words; the DOM HUD is the surface to assert on, never
+pixels.
 
 ## WebXR
 

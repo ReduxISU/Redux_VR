@@ -1,15 +1,17 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { XR } from '@react-three/xr'
 import { type ReactNode, useState } from 'react'
-import { FlatControls, type SceneExtent, Staged } from '../scene/Staged.js'
 import { useXRSupport, type XRSupport, xrStore } from '../xr.js'
+import { Hud } from './hud.js'
 
 /**
- * Everything an activity needs to be looked at, and nothing about what it shows.
+ * One canvas, for the life of the app.
  *
- * Canvas, XR session, lighting, stage normalisation, orbit controls and the
- * ready signal are identical for every scene; framing is not, so the activity
- * computes its own camera and hands the result down.
+ * Mounted above the activity switch on purpose: a WebGL context cannot be
+ * handed to a new one, so a shell that belonged to each activity took the
+ * canvas — and any immersive session — down with it every time a student
+ * changed rooms. Framing belongs to the activity and lives in `Stage`; what is
+ * here is everything that should outlive it.
  */
 
 declare global {
@@ -19,7 +21,14 @@ declare global {
   }
 }
 
-/** Flags the scene as painted so the screenshot tool waits on a fact, not a timer. */
+/**
+ * Flags the canvas as painted so the screenshot tool waits on a fact, not a timer.
+ *
+ * Note what this does *not* promise now that the canvas outlives any one scene:
+ * it fires once, when the canvas first paints, which for an activity that
+ * fetches its data is before that data has arrived. Anything data-driven has to
+ * be asserted with `--await-text` against the HUD.
+ */
 function ReadySignal() {
   const gl = useThree((s) => s.gl)
   const [frames, setFrames] = useState(0)
@@ -40,8 +49,8 @@ function ReadySignal() {
 /**
  * Entering XR needs a real user gesture, and this button must exist *before* the
  * session does — so it is DOM, unlike every other control. It is also the only
- * DOM control left: once the session starts, the overlay is gone and the in-scene
- * panel is the whole interface.
+ * DOM control left: once the session starts, the overlay is gone and the
+ * in-scene panels are the whole interface.
  */
 function EnterVR({ support }: { support: XRSupport }) {
   const [failure, setFailure] = useState<string | null>(null)
@@ -81,33 +90,24 @@ function EnterVR({ support }: { support: XRSupport }) {
   )
 }
 
-export interface SceneShellProps {
-  camera: { position: [number, number, number]; fov: number }
-  /** Drives the XR stage transform: one unit is one metre in a headset. */
-  extent: SceneExtent
-  target: [number, number, number]
-  damping: boolean
-  children: ReactNode
-}
-
-export function SceneShell({ camera, extent, target, damping, children }: SceneShellProps) {
+export function SceneShell({ children }: { children: ReactNode }) {
   const xrSupport = useXRSupport()
 
   return (
     <>
-      <Canvas camera={camera}>
+      <Canvas>
         <XR store={xrStore}>
           <color attach="background" args={['#12151a']} />
           <ambientLight intensity={0.75} />
           <directionalLight position={[5, 8, 6]} intensity={1.5} />
           <directionalLight position={[-6, -3, -5]} intensity={0.35} />
-          <Staged extent={extent}>{children}</Staged>
-          <FlatControls target={target} damping={damping} />
+          {children}
           <ReadySignal />
         </XR>
       </Canvas>
 
       <EnterVR support={xrSupport} />
+      <Hud.Out />
     </>
   )
 }

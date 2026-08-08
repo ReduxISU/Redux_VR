@@ -17,8 +17,9 @@ import type { ActivityProps } from '../../App.js'
 import { solvePacking, verifyPacking } from '../../api/binpacking.js'
 import { type Point3, useDrag } from '../../drag.js'
 import { boxCorners, fitCamera, type V3 } from '../../shell/framing.js'
+import { Hud } from '../../shell/hud.js'
 import { PARAMS } from '../../shell/params.js'
-import { SceneShell } from '../../shell/SceneShell.js'
+import { Stage } from '../../shell/Stage.js'
 import { Board, LIFT } from './Board.js'
 import { Controls, type Verdict } from './Controls.js'
 import { containerLabel, loadLabel, nextSkin, resolveSkin } from './skins.js'
@@ -180,12 +181,7 @@ function Puzzle({
 
   return (
     <>
-      <SceneShell
-        camera={{ position: view.position, fov: FOV }}
-        extent={view.extent}
-        target={view.center}
-        damping={!PARAMS.static}
-      >
+      <Stage view={view} fov={FOV} damping={!PARAMS.static}>
         <Board
           instance={instance}
           layout={layout}
@@ -211,46 +207,48 @@ function Puzzle({
           onSkin={changeSkin}
           onExit={() => onNavigate('hall')}
         />
-      </SceneShell>
+      </Stage>
 
-      <div className="hud">
-        <div>
-          <strong>Bin Packing</strong>
-        </div>
-        <div className="dim">{source}</div>
-        <div className="dim">
-          costume: {skin.title} · capacity {instance.capacity} {skin.unitName} · {instance.binLimit}{' '}
-          {skin.container.toLowerCase()}s
-        </div>
-        <div className="dim">
-          {placement.bins
-            .map(
-              (_, i) =>
-                `${containerLabel(skin, i)}: ${loadLabel(skin, binLoad(instance, placement, i), instance.capacity)}`,
-            )
-            .join(' · ')}
-        </div>
-        <div className="dim">
-          {left.length} to place
-          {over.length > 0 ? ` · ${over.length} over capacity` : ''}
-          {left.length === 0 && over.length === 0 ? ' · ready to check' : ''}
-        </div>
-        {/* What actually goes on the wire. The K-12 view hides this syntax, but
+      <Hud.In>
+        <div className="hud">
+          <div>
+            <strong>Bin Packing</strong>
+          </div>
+          <div className="dim">{source}</div>
+          <div className="dim">
+            costume: {skin.title} · capacity {instance.capacity} {skin.unitName} ·{' '}
+            {instance.binLimit} {skin.container.toLowerCase()}s
+          </div>
+          <div className="dim">
+            {placement.bins
+              .map(
+                (_, i) =>
+                  `${containerLabel(skin, i)}: ${loadLabel(skin, binLoad(instance, placement, i), instance.capacity)}`,
+              )
+              .join(' · ')}
+          </div>
+          <div className="dim">
+            {left.length} to place
+            {over.length > 0 ? ` · ${over.length} over capacity` : ''}
+            {left.length === 0 && over.length === 0 ? ' · ready to check' : ''}
+          </div>
+          {/* What actually goes on the wire. The K-12 view hides this syntax, but
             it is the same string the web GUI sends, and it makes the referee's
             answer something a student can be shown rather than told. */}
-        <div className="dim">certificate: {certificate || '(nothing placed)'}</div>
-        {hintNote && <div className="dim">hint: {hintNote}</div>}
-        <div className="dim">
-          referee:{' '}
-          {verdict.state === 'answered'
-            ? verdict.fits
-              ? 'True'
-              : 'False'
-            : verdict.state === 'unreachable'
-              ? `unreachable — ${verdict.message}`
-              : verdict.state}
+          <div className="dim">certificate: {certificate || '(nothing placed)'}</div>
+          {hintNote && <div className="dim">hint: {hintNote}</div>}
+          <div className="dim">
+            referee:{' '}
+            {verdict.state === 'answered'
+              ? verdict.fits
+                ? 'True'
+                : 'False'
+              : verdict.state === 'unreachable'
+                ? `unreachable — ${verdict.message}`
+                : verdict.state}
+          </div>
         </div>
-      </div>
+      </Hud.In>
     </>
   )
 }
@@ -261,6 +259,10 @@ export function BinPackingActivity({ onNavigate }: ActivityProps) {
     // Parsing outside the stateful component keeps the failure path hook-free.
     return <Puzzle instance={parseInstance(source)} source={source} onNavigate={onNavigate} />
   } catch (err) {
-    return <div className="hud">{(err as Error).message}</div>
+    return (
+      <Hud.In>
+        <div className="hud">{(err as Error).message}</div>
+      </Hud.In>
+    )
   }
 }
