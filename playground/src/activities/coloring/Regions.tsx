@@ -4,17 +4,25 @@ import { PALETTE } from '@redux-vr/layout'
 import {
   COLORING,
   type Coloring,
+  type ColoringEdge,
   type ColoringInstance,
-  type ColoringLayout,
+  type ColoringMap,
   coloringConflicts,
+  mapBorder,
+  mapCentroid,
 } from '@redux-vr/puzzle'
 import { useMemo } from 'react'
-import { BufferAttribute, BufferGeometry } from 'three'
+import { BufferAttribute, BufferGeometry, DoubleSide, Shape, ShapeGeometry, Vector2 } from 'three'
 import { FONT_URL } from '../../scene/typography.js'
 import { inkOn, paintColor, UNPAINTED } from './palette.js'
 
 const CLASH = PALETTE.ElementHighlight as string
 const WALL = '#46566b'
+
+/** How far a region's marker climbs when the map is lifted into its graph. */
+export const LIFT_HEIGHT = 3.4
+
+export type Places = Record<string, [number, number, number]>
 
 function lineGeometry(points: number[]) {
   const geo = new BufferGeometry()
@@ -22,49 +30,142 @@ function lineGeometry(points: number[]) {
   return geo
 }
 
-/**
- * Every wall, and then the offending ones again on top.
- *
- * Two passes rather than per-edge colouring: a clash is the thing a student is
- * hunting for, so it is drawn last, brighter, and a hair higher off the table
- * where nothing can hide it.
- */
-function Walls({
-  instance,
-  layout,
-  coloring,
-}: {
-  instance: ColoringInstance
-  layout: ColoringLayout
-  coloring: Coloring
-}) {
-  const at = layout.positions
-  const geometry = (edges: typeof instance.edges, y: number) =>
-    lineGeometry(
-      edges.flatMap((e) => {
-        const a = at[e.a] ?? [0, 0, 0]
-        const b = at[e.b] ?? [0, 0, 0]
-        return [a[0], y, a[2], b[0], y, b[2]]
-      }),
-    )
+/** Polygons are authored in map coordinates; the shape plane lies down into XZ. */
+function regionShape(polygon: readonly (readonly [number, number])[]) {
+  return new ShapeGeometry(new Shape(polygon.map(([x, z]) => new Vector2(x, z))))
+}
 
-  const all = useMemo(() => geometry(instance.edges, 0.02), [instance, layout])
-  const clashing = coloringConflicts(instance, coloring)
-  const bad = useMemo(() => geometry(clashing, 0.05), [clashing, layout])
+function Territory({
+  polygon,
+  color,
+  opacity,
+  onPaint,
+}: {
+  polygon: readonly (readonly [number, number])[]
+  color: string
+  opacity: number
+  onPaint: () => void
+}) {
+  const geometry = useMemo(() => regionShape(polygon), [polygon])
+  const click = (e: ThreeEvent<MouseEvent>) => {
+    e.stopPropagation()
+    onPaint()
+  }
+  const enter = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation()
+    document.body.style.cursor = 'pointer'
+  }
+  const leave = () => {
+    document.body.style.cursor = 'auto'
+  }
 
   return (
+    <mesh
+      geometry={geometry}
+      position={[0, 0.01, 0]}
+      rotation={[Math.PI / 2, 0, 0]}
+      visible={opacity > 0.01}
+      onClick={click}
+      onPointerOver={enter}
+      onPointerOut={leave}
+    >
+      <meshBasicMaterial color={color} transparent opacity={opacity} side={DoubleSide} />
+    </mesh>
+  )
+}
+
+/**
+ * The whole point of drawing a map at all.
+ *
+ * Territories fade out and their markers climb, so a student watches the map
+ * *become* the graph rather than being told that maps are graphs. Nothing moves
+ * sideways: a marker rises straight out of its own region, which is what makes
+ * the claim legible.
+ */
+function MapWalls({
+  map,
+  clashing,
+  opacity,
+}: {
+  map: ColoringMap
+  clashing: ColoringEdge[]
+  opacity: number
+}) {
+  const outlines = useMemo(
+    () =>
+      lineGeometry(
+        map.regions.flatMap((r) =>
+          r.polygon.flatMap((p, i) => {
+            const q = r.polygon[(i + 1) % r.polygon.length] as readonly [number, number]
+            return [p[0], 0.02, p[1], q[0], 0.02, q[1]]
+          }),
+        ),
+      ),
+    [map],
+  )
+
+  const bad = useMemo(
+    () =>
+      lineGeometry(
+        clashing.flatMap((e) => {
+          const border = mapBorder(map, e.a, e.b)
+          if (!border) return []
+          const [p, q] = border
+          return [p[0], 0.05, p[1], q[0], 0.05, q[1]]
+        }),
+      ),
+    [map, clashing],
+  )
+
+  if (opacity <= 0.01) return null
+  return (
     <>
-      <lineSegments geometry={all}>
-        <lineBasicMaterial color={WALL} transparent opacity={0.6} />
+      <lineSegments geometry={outlines}>
+        <lineBasicMaterial color={WALL} transparent opacity={0.7 * opacity} />
       </lineSegments>
       <lineSegments geometry={bad}>
-        <lineBasicMaterial color={CLASH} transparent opacity={1} />
+        <lineBasicMaterial color={CLASH} transparent opacity={opacity} />
       </lineSegments>
     </>
   )
 }
 
-function Region({
+function Links({
+  instance,
+  places,
+  clashing,
+  opacity,
+}: {
+  instance: ColoringInstance
+  places: Places
+  clashing: ColoringEdge[]
+  opacity: number
+}) {
+  const build = (edges: ColoringEdge[]) =>
+    lineGeometry(
+      edges.flatMap((e) => {
+        const a = places[e.a] ?? [0, 0, 0]
+        const b = places[e.b] ?? [0, 0, 0]
+        return [...a, ...b]
+      }),
+    )
+  const all = build(instance.edges)
+  const bad = build(clashing)
+
+  if (opacity <= 0.01) return null
+  return (
+    <>
+      <lineSegments geometry={all}>
+        <lineBasicMaterial color={WALL} transparent opacity={0.65 * opacity} />
+      </lineSegments>
+      <lineSegments geometry={bad}>
+        <lineBasicMaterial color={CLASH} transparent opacity={opacity} />
+      </lineSegments>
+    </>
+  )
+}
+
+function Marker({
   id,
   position,
   color,
@@ -148,29 +249,80 @@ function Region({
 
 export interface RegionsProps {
   instance: ColoringInstance
-  layout: ColoringLayout
+  /** Where each region's marker sits at ground level. */
+  places: Places
   coloring: Coloring
+  /** Present only when an authored map genuinely depicts this instance. */
+  map?: ColoringMap
+  /** 0 is the flat map, 1 is the graph it lifts into. */
+  lift?: number
   interactive?: boolean
   onPaint?: (id: string) => void
 }
 
-export function Regions({ instance, layout, coloring, interactive = true, onPaint }: RegionsProps) {
-  const clashing = new Set(coloringConflicts(instance, coloring).flatMap((e) => [e.a, e.b]))
+export function Regions({
+  instance,
+  places,
+  coloring,
+  map,
+  lift = 1,
+  interactive = true,
+  onPaint,
+}: RegionsProps) {
+  const clashing = coloringConflicts(instance, coloring)
+  const clashingIds = new Set(clashing.flatMap((e) => [e.a, e.b]))
   const noop = () => {}
+  const paint = interactive ? (onPaint ?? noop) : noop
+
+  // Without a map there is nothing to lift, so the graph is simply the view.
+  const raised = map ? lift : 1
+  const lifted: Places = Object.fromEntries(
+    Object.entries(places).map(([id, p]) => [id, [p[0], p[1] + raised * LIFT_HEIGHT, p[2]]]),
+  )
 
   return (
     <group>
-      <Walls instance={instance} layout={layout} coloring={coloring} />
+      {map && (
+        <>
+          {map.regions.map((region) => (
+            <Territory
+              key={region.id}
+              polygon={region.polygon}
+              color={
+                coloring[region.id] === undefined
+                  ? UNPAINTED
+                  : paintColor(coloring[region.id] as number)
+              }
+              opacity={(1 - raised) * 0.92}
+              onPaint={() => paint(region.id)}
+            />
+          ))}
+          <MapWalls map={map} clashing={clashing} opacity={1 - raised} />
+        </>
+      )}
+
+      <Links instance={instance} places={lifted} clashing={clashing} opacity={raised} />
+
       {instance.nodes.map((id) => (
-        <Region
+        <Marker
           key={id}
           id={id}
-          position={(layout.positions[id] ?? [0, 0, 0]) as [number, number, number]}
+          position={lifted[id] ?? [0, 0, 0]}
           color={coloring[id]}
-          clashing={clashing.has(id)}
-          onPaint={interactive ? (onPaint ?? noop) : noop}
+          clashing={clashingIds.has(id)}
+          onPaint={paint}
         />
       ))}
     </group>
+  )
+}
+
+/** Ground-level marker spots for a map: each region's own centroid. */
+export function placesFromMap(map: ColoringMap): Places {
+  return Object.fromEntries(
+    map.regions.map((r) => {
+      const [x, z] = mapCentroid(r)
+      return [r.id, [x, 0, z] as [number, number, number]]
+    }),
   )
 }

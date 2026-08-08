@@ -1,14 +1,15 @@
-import { emptyColoring, layoutColoring, paintNode, parseColoring } from '@redux-vr/puzzle'
+import { emptyColoring, mapBounds, mapFor, paintNode, parseColoring } from '@redux-vr/puzzle'
 import { useMemo } from 'react'
-import { Regions } from '../coloring/Regions.js'
+import { placesFromMap, Regions } from '../coloring/Regions.js'
 import { fitOnPlinth } from './fit.js'
 
 /**
- * The real map, shrunk — same layout code, same regions.
+ * The real map, shrunk — same geometry, same regions.
  *
- * Caught part-coloured, and deliberately with one clash showing: the amber
- * border is what the puzzle is *about*, and a tidy finished map on the plinth
- * would say there is nothing left to do here.
+ * Shown flat rather than lifted: the map is what a student meets first, and a
+ * plinth should advertise the way in. Caught part-coloured and deliberately
+ * with a clash showing, because the amber border is what the puzzle is *about*
+ * and a tidy finished map would say there is nothing left to do here.
  */
 
 const INSTANCE = parseColoring(
@@ -16,7 +17,7 @@ const INSTANCE = parseColoring(
 )
 
 export function ColoringDiorama({ size }: { size: number }) {
-  const layout = useMemo(() => layoutColoring(INSTANCE), [])
+  const map = useMemo(() => mapFor(INSTANCE), [])
   const coloring = useMemo(() => {
     let c = emptyColoring()
     c = paintNode(INSTANCE, c, 'a', 0)
@@ -27,11 +28,21 @@ export function ColoringDiorama({ size }: { size: number }) {
     return c
   }, [])
 
-  const fit = fitOnPlinth(layout.bounds.min, layout.bounds.max, size)
+  if (!map) return null
+
+  const { min, max } = mapBounds(map)
+  const fit = fitOnPlinth([min[0], 0, min[1]], [max[0], 0, max[1]], size)
 
   return (
     <group scale={fit.scale} position={fit.position}>
-      <Regions instance={INSTANCE} layout={layout} coloring={coloring} interactive={false} />
+      <Regions
+        instance={INSTANCE}
+        places={placesFromMap(map)}
+        coloring={coloring}
+        map={map}
+        lift={0}
+        interactive={false}
+      />
     </group>
   )
 }

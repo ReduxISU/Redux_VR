@@ -1,3 +1,4 @@
+import { useFrame } from '@react-three/fiber'
 import {
   type Coloring,
   type ColoringInstance,
@@ -7,6 +8,8 @@ import {
   emptyColoring,
   encodeColoringCertificate,
   layoutColoring,
+  mapBounds,
+  mapFor,
   paintNode,
   parseColoring,
   uncolored,
@@ -19,7 +22,7 @@ import { Hud } from '../../shell/hud.js'
 import { PARAMS } from '../../shell/params.js'
 import { Stage } from '../../shell/Stage.js'
 import { Controls, type Verdict } from './Controls.js'
-import { Regions } from './Regions.js'
+import { LIFT_HEIGHT, type Places, placesFromMap, Regions } from './Regions.js'
 
 /**
  * Colour the map so no two touching regions match.
@@ -43,7 +46,32 @@ const FRAMING_MARGIN = 1.12
 const VIEW_DIR: V3 = [0, 1.75, 1]
 
 /** Half-extents of the control block — swatch tray plus button row. */
-const CONTROLS = { halfWidth: 5.2, halfHeight: 1.7, lift: 0.9, gap: 2.2 }
+const CONTROLS = { halfWidth: 6.4, halfHeight: 1.7, lift: 0.9, gap: 2.2 }
+
+/**
+ * Eases the map up and down.
+ *
+ * A cut would show the two states; the travel is what says they are the same
+ * thing. Frozen for screenshots, where a half-raised map is just a blurred one.
+ */
+function LiftDriver({
+  target,
+  value,
+  onChange,
+}: {
+  target: number
+  value: number
+  onChange: (next: number) => void
+}) {
+  useFrame((_, delta) => {
+    if (Math.abs(target - value) < 0.002) {
+      if (value !== target) onChange(target)
+      return
+    }
+    onChange(value + (target - value) * Math.min(1, delta * 5))
+  })
+  return null
+}
 
 function Puzzle({
   instance,
@@ -54,12 +82,24 @@ function Puzzle({
   source: string
   onNavigate: (id: string) => void
 }) {
+  /**
+   * A map when one provably depicts this instance, and the plain graph
+   * otherwise — most instances have no map, and a non-planar one can have none.
+   * Drawing an approximate map would be drawing a different problem.
+   */
+  const map = useMemo(() => mapFor(instance), [instance])
   const layout = useMemo(() => layoutColoring(instance), [instance])
+  const places: Places = useMemo(
+    () => (map ? placesFromMap(map) : (layout.positions as Places)),
+    [map, layout],
+  )
   const [coloring, setColoring] = useState<Coloring>(emptyColoring)
   const [active, setActive] = useState(0)
   const [verdict, setVerdict] = useState<Verdict>({ state: 'idle' })
   const [hinting, setHinting] = useState(false)
   const [hintNote, setHintNote] = useState<string | null>(null)
+  const [raised, setRaised] = useState(() => (map && !PARAMS.lift ? 0 : 1))
+  const [lift, setLift] = useState(() => (map && !PARAMS.lift ? 0 : 1))
 
   /** Any answer older than the board it was asked about is thrown away. */
   const asked = useRef(0)
@@ -125,25 +165,29 @@ function Puzzle({
     forget()
   }, [forget])
 
-  const controlAnchor: [number, number, number] = [
-    0,
-    CONTROLS.lift,
-    layout.bounds.max[2] + CONTROLS.gap,
-  ]
+  const bounds = useMemo(() => {
+    if (!map) return layout.bounds
+    const { min, max } = mapBounds(map)
+    return { min: [min[0], 0, min[1]] as V3, max: [max[0], 0, max[1]] as V3 }
+  }, [map, layout])
+
+  const controlAnchor: [number, number, number] = [0, CONTROLS.lift, bounds.max[2] + CONTROLS.gap]
 
   const view = useMemo(() => {
-    const { min, max } = layout.bounds
+    const { min, max } = bounds
     const controlsZ = max[2] + CONTROLS.gap
+    // Framed for the lifted state too, or raising the map carries it off the top.
+    const ceiling: V3 = [max[0], max[1] + LIFT_HEIGHT + 0.6, max[2]]
     return fitCamera(
       [
-        ...boxCorners(min, max),
+        ...boxCorners(min, ceiling),
         [-CONTROLS.halfWidth, CONTROLS.lift - CONTROLS.halfHeight, controlsZ],
         [CONTROLS.halfWidth, CONTROLS.lift + CONTROLS.halfHeight, controlsZ],
       ],
       window.innerWidth / window.innerHeight,
       { fov: FOV, margin: FRAMING_MARGIN, viewDir: VIEW_DIR },
     )
-  }, [layout])
+  }, [bounds])
 
   const left = uncolored(instance, coloring)
   const clashes = coloringConflicts(instance, coloring)
@@ -151,7 +195,15 @@ function Puzzle({
   return (
     <>
       <Stage view={view} fov={FOV} damping={!PARAMS.static}>
-        <Regions instance={instance} layout={layout} coloring={coloring} onPaint={paint} />
+        <Regions
+          instance={instance}
+          places={places}
+          coloring={coloring}
+          {...(map ? { map } : {})}
+          lift={lift}
+          onPaint={paint}
+        />
+        {map && !PARAMS.static && <LiftDriver target={raised} value={lift} onChange={setLift} />}
         <Controls
           anchor={controlAnchor}
           verdict={verdict}
@@ -162,6 +214,16 @@ function Puzzle({
           hinting={hinting}
           hintNote={hintNote}
           paintedAnything={certificate !== ''}
+          {...(map
+            ? {
+                lifted: raised > 0.5,
+                onLift: () => {
+                  const next = raised > 0.5 ? 0 : 1
+                  setRaised(next)
+                  if (PARAMS.static) setLift(next)
+                },
+              }
+            : {})}
           onColor={setActive}
           onCheck={check}
           onHint={hint}
@@ -179,6 +241,11 @@ function Puzzle({
           <div className="dim">
             {instance.nodes.length} regions · {instance.edges.length} borders · {instance.colors}{' '}
             colours
+          </div>
+          <div className="dim">
+            {map
+              ? `map: ${map.id} · ${raised > 0.5 ? 'lifted' : 'flat'}`
+              : 'map: none — graph only'}
           </div>
           <div className="dim">
             {left.length} uncoloured

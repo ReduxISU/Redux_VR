@@ -21,6 +21,8 @@ export interface AppParams {
   instance: string | null
   /** Which costume an activity opens in. Presentation only — never the puzzle. */
   skin: string | null
+  /** Open a map already lifted into its graph. */
+  lift: boolean
 
   // Below here: owned by the reduction activity.
   fixtures: boolean
@@ -40,6 +42,7 @@ export function readParams(search: string): AppParams {
     static: p.get('static') === '1',
     instance: p.get('instance'),
     skin: p.get('skin'),
+    lift: p.get('lift') === '1',
     fixtures: p.get('source') === 'fixtures',
     frame: frame === null ? null : Number(frame),
     world: p.get('world') ?? 'both',

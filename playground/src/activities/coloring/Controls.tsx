@@ -24,6 +24,9 @@ export interface ControlsProps {
   hinting: boolean
   hintNote: string | null
   paintedAnything: boolean
+  /** Absent when no authored map depicts this instance — nothing to lift. */
+  lifted?: boolean
+  onLift?: () => void
   onColor: (index: number) => void
   onCheck: () => void
   onHint: () => void
@@ -71,6 +74,8 @@ export function Controls({
   hinting,
   hintNote,
   paintedAnything,
+  lifted,
+  onLift,
   onColor,
   onCheck,
   onHint,
@@ -78,7 +83,8 @@ export function Controls({
   onExit,
 }: ControlsProps) {
   const pitch = BUTTON.width + BUTTON.gap
-  const at = (slot: number) => (slot - 1.5) * pitch
+  const slots = onLift ? 5 : 4
+  const at = (slot: number) => (slot - (slots - 1) / 2) * pitch
   const swatchPitch = SWATCH.width + SWATCH.gap
   const line = headline(verdict, remaining, clashes, hintNote)
 
@@ -139,8 +145,19 @@ export function Controls({
         disabled={hinting}
         onSelect={onHint}
       />
+      {onLift && (
+        <Button3D
+          position={[at(3), 0, 0]}
+          width={BUTTON.width}
+          height={BUTTON.height}
+          label={lifted ? 'Lay it flat' : 'Lift it'}
+          detail={lifted ? 'back to the map' : 'the map is a graph'}
+          active={lifted}
+          onSelect={onLift}
+        />
+      )}
       <Button3D
-        position={[at(3), 0, 0]}
+        position={[at(slots - 1), 0, 0]}
         width={BUTTON.width}
         height={BUTTON.height}
         label="Start over"

@@ -4,6 +4,7 @@ export type { Coloring, ColoringEdge, ColoringInstance } from './coloring.js'
 export {
   clearNode,
   coloringConflicts,
+  coloringEdgeId,
   decodeColoringCertificate,
   emptyColoring,
   encodeColoringCertificate,
@@ -14,6 +15,16 @@ export {
 } from './coloring.js'
 export type { ColoringLayout } from './coloring-layout.js'
 export { COLORING, layoutColoring } from './coloring-layout.js'
+export type { ColoringMap, MapPoint, MapRegion, Segment } from './coloring-map.js'
+export {
+  HUB_AND_PETALS,
+  mapAdjacency,
+  mapBorder,
+  mapBounds,
+  mapCentroid,
+  mapDepicts,
+  mapFor,
+} from './coloring-map.js'
 export {
   binId,
   decodeCertificate,

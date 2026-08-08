@@ -99,6 +99,7 @@ tunnel (`shell/tunnel.ts`) — `react-dom`'s `createPortal` cannot cross between
 | `?activity=hall\|binpacking\|reduction` | which scene to open; default `hall` |
 | `?instance=<string>` | the problem instance, in the backend's own syntax — e.g. `((4,7,3,6,2,8),10,3)`. Lets a printed kit or worksheet carry the exact puzzle a class is working on |
 | `?skin=trucks\|hawaii` | which telling of a puzzle to open in; presentation only, never the puzzle |
+| `?lift=1` | open a colouring map already lifted into its graph |
 | `?reduction=<className>` | which reduction to show; default `SipserReduceToCliqueStandard` |
 | `?mode=reduction\|gadgets\|solution` | which correspondences to draw; default `reduction` |
 | `?focus=<id>` | pre-select an element, e.g. `?focus=x2_2` — deep-links a specific correspondence |

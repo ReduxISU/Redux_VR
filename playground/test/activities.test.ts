@@ -52,6 +52,7 @@ describe('readParams', () => {
       static: false,
       instance: null,
       skin: null,
+      lift: false,
       fixtures: false,
       frame: null,
       world: 'both',

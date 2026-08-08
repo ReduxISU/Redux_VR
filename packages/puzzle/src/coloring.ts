@@ -27,7 +27,7 @@ export type Coloring = Record<string, number>
 const SHAPE = /^\(\(\{([^{}]*)\},\{(.*)\}\),(-?\d+)\)$/
 
 /** Unordered: {a,b} and {b,a} are one edge, as they are one wall on a map. */
-const edgeKey = (a: string, b: string) => (a < b ? `${a}--${b}` : `${b}--${a}`)
+export const coloringEdgeId = (a: string, b: string) => (a < b ? `${a}--${b}` : `${b}--${a}`)
 
 export function parseColoring(instance: string): ColoringInstance {
   // Trimmed per token rather than stripped wholesale: node names may contain
@@ -68,7 +68,7 @@ export function parseColoring(instance: string): ColoringInstance {
     if (!known.has(a) || !known.has(b)) {
       throw new Error(`graph colouring: "${raw}" joins a node the instance never declared`)
     }
-    const id = edgeKey(a, b)
+    const id = coloringEdgeId(a, b)
     if (!seen.has(id)) seen.set(id, { id, a, b })
   }
 
