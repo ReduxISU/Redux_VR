@@ -1,0 +1,13 @@
+# Redux Build System pipeline config. See github.com/ReduxISU/Redux_Build_System.
+#
+# rbs runs every operation from this directory, which is why the npm-workspaces layout costs
+# nothing here: `npm audit`, `biome check .`, `eslint .`, `tsc --noEmit` and `vitest run` are
+# already whole-repo commands. There is no per-package gate to miss.
+engine = "npm"
+
+[artifact]
+# Nothing is published yet — `push` is unimplemented and this repo has no registry presence. The
+# name is what `build` tags locally (local/redux-vr:ci). `port` and `health-path` arrive with the
+# Dockerfile rather than being guessed at here, so `build` reports `skipped` until then, and
+# `integration-test` stays blocked behind it.
+name = "redux-vr"

@@ -1,0 +1,30 @@
+name: rbs
+
+# The gates themselves live in Redux_Build_System and run inside this repo's own devcontainer, so
+# "it passed locally" and "it passed in the PR" mean the same thing. What runs is decided by
+# rbs.toml, not by this file — which is why there is nothing here to keep in sync.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A reusable workflow can only narrow the token it is given, never widen it: without
+# pull-requests:write the sticky report comment 403s.
+permissions:
+  contents: read
+  pull-requests: write
+  packages: write
+
+concurrency:
+  group: rbs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    uses: ReduxISU/Redux_Build_System/.github/workflows/ci.yml@main
+    secrets: inherit
+    with:
+      # Report without failing the job while rbs is on trial here. Drop this once two runs are
+      # green and the report is trusted.
+      soft: true

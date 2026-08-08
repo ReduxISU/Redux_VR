@@ -1,0 +1,38 @@
+# Shared dev-loop tasks. Node comes from the devcontainer feature, so there is no [tools] section;
+# rbs owns the gates, mise owns the shortcuts.
+
+[tasks.dev]
+description = "Run the dev server on http://localhost:5173"
+run = "npm run dev"
+
+[tasks.build]
+description = "Production build"
+run = "npm run build"
+
+[tasks.preview]
+description = "Serve the production build on http://localhost:4173"
+run = "npm run preview"
+
+[tasks.test]
+description = "Unit tests (no browser, no GPU)"
+run = "npm test"
+
+[tasks.typecheck]
+description = "Type-check the whole repo"
+run = "npm run typecheck"
+
+[tasks.lint]
+description = "Lint with ESLint, including the packages/* purity fence"
+run = "npm run lint"
+
+[tasks.format]
+description = "Format with Biome"
+run = "npm run format"
+
+[tasks."format:check"]
+description = "Check formatting (no writes)"
+run = "npm run format:check"
+
+[tasks.shoot]
+description = "Screenshot the running dev server — mise run shoot <name>"
+run = "npm run shoot --"

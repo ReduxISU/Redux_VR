@@ -8,4 +8,10 @@ export default defineConfig({
     host: true,
     port: 5173,
   },
+  // Same reason, plus: a devcontainer's forwarded port is dead if this binds loopback.
+  preview: {
+    host: true,
+    port: 4173,
+    strictPort: true,
+  },
 })

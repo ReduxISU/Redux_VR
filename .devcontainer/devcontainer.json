@@ -1,0 +1,32 @@
+{
+  "name": "Redux VR Dev Container",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "26" },
+    // moby:false is required on the current base image — moby-cli is not packaged for Debian
+    // trixie and the feature build fails outright. rbs needs a docker CLI for build/integration-test.
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": { "moby": false },
+    "ghcr.io/reduxisu/features/rbs:1": {}
+  },
+  "appPort": [5173, 4173],
+  "portsAttributes": {
+    "5173": { "label": "Redux VR (vite dev)", "onAutoForward": "notify" },
+    "4173": { "label": "Redux VR (vite preview)", "onAutoForward": "silent" }
+  },
+  // One volume is enough: npm workspaces hoist every dependency to the root and this repo has no
+  // per-package node_modules. The repo itself is bind-mounted, so a host-installed tree would
+  // carry host absolute paths and host-built native binaries — sharing it breaks both sides.
+  "mounts": [
+    "source=redux_vr-node_modules,target=${containerWorkspaceFolder}/node_modules,type=volume"
+  ],
+  "containerUser": "vscode",
+  "remoteUser": "vscode",
+  "updateRemoteUserUID": true,
+  "postStartCommand": "if [ \"$(stat -c %U /workspaces/Redux_VR)\" != \"vscode\" ]; then sudo chown -R vscode:vscode /workspaces/Redux_VR; fi",
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "biomejs.biome", "vitest.explorer"]
+    }
+  }
+}
