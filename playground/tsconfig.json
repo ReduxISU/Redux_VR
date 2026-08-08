@@ -4,7 +4,8 @@
     "jsx": "react-jsx",
     "types": ["vite/client"],
     "paths": {
-      "@redux-vr/layout": ["../packages/layout/src/index.ts"]
+      "@redux-vr/layout": ["../packages/layout/src/index.ts"],
+      "@redux-vr/puzzle": ["../packages/puzzle/src/index.ts"]
     }
   },
   "include": ["src", "vite.config.ts"]

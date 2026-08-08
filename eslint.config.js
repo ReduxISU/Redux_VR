@@ -6,26 +6,27 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    // packages/layout is the pure layer: reduction JSON -> positions.
-    // Importing a renderer or React here means the boundary is wrong.
-    files: ['packages/layout/**/*.ts'],
+    // packages/* is the pure layer: data in, positions out. `layout` does it for
+    // reductions, `puzzle` for the K-12 activities. Importing a renderer or React
+    // into either means the boundary is wrong.
+    files: ['packages/*/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
         {
           patterns: [
-            { group: ['three', 'three/*'], message: 'layout must stay renderer-agnostic' },
+            { group: ['three', 'three/*'], message: 'packages/* must stay renderer-agnostic' },
             {
               group: ['react', 'react-dom', '@react-three/*'],
-              message: 'layout must stay React-free',
+              message: 'packages/* must stay React-free',
             },
           ],
         },
       ],
       'no-restricted-globals': [
         'error',
-        { name: 'window', message: 'layout must stay DOM-free' },
-        { name: 'document', message: 'layout must stay DOM-free' },
+        { name: 'window', message: 'packages/* must stay DOM-free' },
+        { name: 'document', message: 'packages/* must stay DOM-free' },
       ],
     },
   },

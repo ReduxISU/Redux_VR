@@ -1,0 +1,11 @@
+{
+  "name": "@redux-vr/puzzle",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure bin-packing puzzle model: instance -> items, placement, certificate, positions. No three.js, no React, no DOM.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
