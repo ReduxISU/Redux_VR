@@ -77,10 +77,24 @@ page.on('pageerror', (e) => errors.push(e.message))
 let failed = false
 try {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
-  await page.waitForFunction(() => window.__sceneReady === true, null, { timeout: 30_000 })
 
-  const settle = () =>
-    page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+  const ready = () =>
+    page.waitForFunction(() => window.__sceneReady === true, null, { timeout: 30_000 })
+
+  await ready()
+
+  const settle = async () => {
+    try {
+      await page.evaluate(
+        () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+      )
+    } catch {
+      // An in-scene click can be a navigation — changing activity loads a new
+      // URL — which destroys the context this was evaluating in. Wait for the
+      // scene that replaced it instead of failing.
+      await ready()
+    }
+  }
 
   // Interaction flags run in the order they were typed, so a session reads as a
   // script: click, wait for the scene to say it happened, click again. Anything

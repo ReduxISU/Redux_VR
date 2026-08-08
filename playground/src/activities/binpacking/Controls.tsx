@@ -32,6 +32,7 @@ export interface ControlsProps {
   onHint: () => void
   onReset: () => void
   onSkin: () => void
+  onExit: () => void
 }
 
 function headline(verdict: Verdict, remaining: number, hintNote: string | null) {
@@ -67,11 +68,12 @@ export function Controls({
   onHint,
   onReset,
   onSkin,
+  onExit,
 }: ControlsProps) {
   const pitch = BUTTON.width + BUTTON.gap
   const line = headline(verdict, remaining, hintNote)
-  /** Four across, centred: -1.5, -0.5, +0.5, +1.5 of the pitch. */
-  const at = (slot: number) => (slot - 1.5) * pitch
+  /** Five across, centred. */
+  const at = (slot: number) => (slot - 2) * pitch
 
   return (
     <Billboard position={anchor}>
@@ -93,13 +95,21 @@ export function Controls({
         position={[at(0), 0, 0]}
         width={BUTTON.width}
         height={BUTTON.height}
+        label="Hall"
+        detail="pick another problem"
+        onSelect={onExit}
+      />
+      <Button3D
+        position={[at(1), 0, 0]}
+        width={BUTTON.width}
+        height={BUTTON.height}
         label="Check it"
         disabled={remaining > 0 || verdict.state === 'asking'}
         active={verdict.state === 'answered' && verdict.fits}
         onSelect={onCheck}
       />
       <Button3D
-        position={[at(1), 0, 0]}
+        position={[at(2), 0, 0]}
         width={BUTTON.width}
         height={BUTTON.height}
         label={hinting ? 'thinking…' : 'Show me'}
@@ -108,7 +118,7 @@ export function Controls({
         onSelect={onHint}
       />
       <Button3D
-        position={[at(2), 0, 0]}
+        position={[at(3), 0, 0]}
         width={BUTTON.width}
         height={BUTTON.height}
         label={nextSkinTitle}
@@ -116,7 +126,7 @@ export function Controls({
         onSelect={onSkin}
       />
       <Button3D
-        position={[at(3), 0, 0]}
+        position={[at(4), 0, 0]}
         width={BUTTON.width}
         height={BUTTON.height}
         label="Start over"

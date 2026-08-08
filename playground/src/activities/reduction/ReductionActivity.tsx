@@ -10,6 +10,7 @@ import {
   type World,
 } from '@redux-vr/layout'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { ActivityProps } from '../../App.js'
 import {
   BASE_URL,
   type CatalogItem,
@@ -151,7 +152,7 @@ function segmentsForMode(all: LinkSegment[], mode: Mode): LinkSegment[] {
   return all.filter((s) => s.kind === 'ClauseHighlight')
 }
 
-export function ReductionActivity() {
+export function ReductionActivity({ onNavigate }: ActivityProps) {
   const [status, setStatus] = useState<Status>({ state: 'loading' })
   const [mode, setMode] = useState<Mode>(INITIAL_MODE)
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
@@ -284,6 +285,7 @@ export function ReductionActivity() {
             open={menuOpen}
             onToggle={() => setMenuOpen((v) => !v)}
             busy={busy}
+            onExit={() => onNavigate('hall')}
           />
         )}
       </SceneShell>

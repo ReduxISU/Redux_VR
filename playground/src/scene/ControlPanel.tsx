@@ -54,6 +54,7 @@ export interface ControlPanelProps {
   open: boolean
   onToggle: () => void
   busy: boolean
+  onExit: () => void
 }
 
 export function ControlPanel({
@@ -69,6 +70,7 @@ export function ControlPanel({
   open,
   onToggle,
   busy,
+  onExit,
 }: ControlPanelProps) {
   const w = panelWidth(open)
   const h = panelHeight(open)
@@ -136,6 +138,15 @@ export function ControlPanel({
         {busy ? 'loading reduction…' : hint}
       </Text>
 
+      {/* Beside the toggle rather than in the mode row: the modes say what the
+          reduction shows, and leaving the room is not one of them. */}
+      <Button3D
+        position={[-(PANEL.modeW * 0.8 + PANEL.gap + PANEL.modeW / 2), toggleY, 0]}
+        width={PANEL.modeW}
+        height={PANEL.modeH}
+        label="Hall"
+        onSelect={onExit}
+      />
       <Button3D
         position={[0, toggleY, 0]}
         width={PANEL.modeW * 1.6}

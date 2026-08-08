@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ACTIVITIES, DEFAULT_ACTIVITY, resolveActivityId } from '../src/shell/activities.js'
+import { ACTIVITIES, DEFAULT_ACTIVITY, resolveActivityId, shelf } from '../src/shell/activities.js'
 import { readParams } from '../src/shell/params.js'
 
 describe('resolveActivityId', () => {
@@ -13,8 +13,21 @@ describe('resolveActivityId', () => {
     expect(resolveActivityId('graphcoloring')).toBe(DEFAULT_ACTIVITY)
   })
 
-  it('returns every registered id unchanged', () => {
-    for (const id of Object.keys(ACTIVITIES)) expect(resolveActivityId(id)).toBe(id)
+  it('returns every built id unchanged', () => {
+    const built = Object.values(ACTIVITIES).filter((a) => a.status === 'ready')
+    expect(built.length).toBeGreaterThan(1)
+    for (const a of built) expect(resolveActivityId(a.id)).toBe(a.id)
+  })
+
+  it('refuses a listed-but-unbuilt id, since a name plate is not a route', () => {
+    const planned = Object.values(ACTIVITIES).filter((a) => a.status === 'planned')
+    expect(planned.length).toBeGreaterThan(0)
+    for (const a of planned) expect(resolveActivityId(a.id)).toBe(DEFAULT_ACTIVITY)
+  })
+
+  it('opens on the hall, so the shelf is the front door', () => {
+    expect(DEFAULT_ACTIVITY).toBe('hall')
+    expect(ACTIVITIES[DEFAULT_ACTIVITY]?.status).toBe('ready')
   })
 
   it('does not resolve inherited Object properties', () => {
@@ -79,5 +92,34 @@ describe('readParams', () => {
     expect(p.world).toBe('from')
     expect(p.focus).toBe('x2_2')
     expect(p.reduction).toBe('KarpSATToSAT3')
+  })
+})
+
+describe('shelf', () => {
+  it('leaves the hall off its own shelf', () => {
+    expect(shelf().map((e) => e.id)).not.toContain('hall')
+  })
+
+  it('lists every other activity, built or not', () => {
+    const others = Object.values(ACTIVITIES).filter((a) => a.wing !== 'hub')
+    expect(shelf()).toHaveLength(others.length)
+  })
+
+  it('puts the K-12 wing first and the CS wing at the far end', () => {
+    const wings = shelf().map((e) => e.wing)
+    expect(wings.indexOf('cs')).toBeGreaterThan(wings.lastIndexOf('k12'))
+  })
+
+  it('shows the gaps rather than a finished-looking shelf', () => {
+    // Empty plinths are the crowd-sourcing ask, not an oversight.
+    expect(shelf().some((e) => e.status === 'planned')).toBe(true)
+  })
+
+  it('gives every plinth a name and a one-line blurb to put on it', () => {
+    for (const e of shelf()) {
+      expect(e.title.length).toBeGreaterThan(0)
+      expect(e.blurb.length).toBeGreaterThan(0)
+      expect(e.blurb.length).toBeLessThanOrEqual(60)
+    }
   })
 })

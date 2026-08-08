@@ -13,6 +13,7 @@ import {
   trayItems,
 } from '@redux-vr/puzzle'
 import { useCallback, useMemo, useRef, useState } from 'react'
+import type { ActivityProps } from '../../App.js'
 import { solvePacking, verifyPacking } from '../../api/binpacking.js'
 import { type Point3, useDrag } from '../../drag.js'
 import { boxCorners, fitCamera, type V3 } from '../../shell/framing.js'
@@ -57,9 +58,17 @@ const FRAMING_MARGIN = 1.08
 const VIEW_DIR: V3 = [0, 1.05, 1]
 
 /** Half-extents of the control row, so the camera frames it with the board. */
-const CONTROLS = { halfWidth: 5.0, halfHeight: 0.85, lift: 0.85, gap: 1.9 }
+const CONTROLS = { halfWidth: 6.4, halfHeight: 0.85, lift: 0.85, gap: 1.9 }
 
-function Puzzle({ instance, source }: { instance: BinPackingInstance; source: string }) {
+function Puzzle({
+  instance,
+  source,
+  onNavigate,
+}: {
+  instance: BinPackingInstance
+  source: string
+  onNavigate: (id: string) => void
+}) {
   const layout = useMemo(() => layoutPuzzle(instance), [instance])
   const [placement, setPlacement] = useState(() => emptyPlacement(instance))
   const [verdict, setVerdict] = useState<Verdict>({ state: 'idle' })
@@ -200,6 +209,7 @@ function Puzzle({ instance, source }: { instance: BinPackingInstance; source: st
           onHint={hint}
           onReset={reset}
           onSkin={changeSkin}
+          onExit={() => onNavigate('hall')}
         />
       </SceneShell>
 
@@ -245,11 +255,11 @@ function Puzzle({ instance, source }: { instance: BinPackingInstance; source: st
   )
 }
 
-export function BinPackingActivity() {
+export function BinPackingActivity({ onNavigate }: ActivityProps) {
   const source = PARAMS.instance ?? DEFAULT_INSTANCE
   try {
     // Parsing outside the stateful component keeps the failure path hook-free.
-    return <Puzzle instance={parseInstance(source)} source={source} />
+    return <Puzzle instance={parseInstance(source)} source={source} onNavigate={onNavigate} />
   } catch (err) {
     return <div className="hud">{(err as Error).message}</div>
   }

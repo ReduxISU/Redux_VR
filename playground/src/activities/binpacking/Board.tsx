@@ -90,12 +90,14 @@ function Crate({
   placement,
   targeted,
   skin,
+  labelled,
 }: {
   bin: BinBody
   instance: BinPackingInstance
   placement: Placement
   targeted: boolean
   skin: Skin
+  labelled: boolean
 }) {
   const edges = useMemo(() => lineGeometry(crateEdges(bin)), [bin])
   const ticks = useMemo(
@@ -127,37 +129,39 @@ function Crate({
           it off the top of the frame — which is exactly when the number matters
           most. Fixed at the rim it stays framed, and being nearest the camera it
           draws over whatever is bursting out behind it. */}
-      <Billboard
-        position={[
-          bin.position[0],
-          bin.position[1] + bin.height + 0.42,
-          bin.position[2] + bin.depth / 2 + 0.35,
-        ]}
-      >
-        <Text
-          font={FONT_URL}
-          position={[0, 0.34, 0]}
-          fontSize={0.2}
-          color={over ? OVER : '#8fa0b6'}
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.014}
-          outlineColor="#0b0e12"
+      {labelled && (
+        <Billboard
+          position={[
+            bin.position[0],
+            bin.position[1] + bin.height + 0.42,
+            bin.position[2] + bin.depth / 2 + 0.35,
+          ]}
         >
-          {containerLabel(skin, bin.index)}
-        </Text>
-        <Text
-          font={FONT_URL}
-          fontSize={0.34}
-          color={over ? OVER : '#c6d2e2'}
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.016}
-          outlineColor="#0b0e12"
-        >
-          {loadLabel(skin, load, instance.capacity)}
-        </Text>
-      </Billboard>
+          <Text
+            font={FONT_URL}
+            position={[0, 0.34, 0]}
+            fontSize={0.2}
+            color={over ? OVER : '#8fa0b6'}
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.014}
+            outlineColor="#0b0e12"
+          >
+            {containerLabel(skin, bin.index)}
+          </Text>
+          <Text
+            font={FONT_URL}
+            fontSize={0.34}
+            color={over ? OVER : '#c6d2e2'}
+            anchorX="center"
+            anchorY="middle"
+            outlineWidth={0.016}
+            outlineColor="#0b0e12"
+          >
+            {loadLabel(skin, load, instance.capacity)}
+          </Text>
+        </Billboard>
+      )}
     </group>
   )
 }
@@ -174,12 +178,14 @@ function Block({
   position,
   held,
   skin,
+  interactive,
   onGrab,
 }: {
   item: ItemBody
   position: Point3
   held: boolean
   skin: Skin
+  interactive: boolean
   onGrab: (id: string, at: Point3) => void
 }) {
   const grab = (e: ThreeEvent<PointerEvent>) => {
@@ -195,9 +201,14 @@ function Block({
   const leave = () => {
     document.body.style.cursor = 'auto'
   }
+  // A board on display in the hall is one exhibit, not six draggable blocks:
+  // handlers here would swallow the click meant for the plinth.
+  const handlers = interactive
+    ? { onPointerDown: grab, onPointerOver: enter, onPointerOut: leave }
+    : {}
 
   const label = blockLabel(skin, item.index, item.size)
-  const named = Boolean(label.name) && item.height >= NAME_MIN_HEIGHT
+  const named = interactive && Boolean(label.name) && item.height >= NAME_MIN_HEIGHT
   const ink = inkOn(blockColor(item.size))
 
   return (
@@ -207,7 +218,7 @@ function Block({
           could be placed once and then never picked up again. It does not need
           muting anyway — it has no move or up handler, so R3F carries those
           straight through to the plane behind it. */}
-      <mesh onPointerDown={grab} onPointerOver={enter} onPointerOut={leave}>
+      <mesh {...handlers}>
         <boxGeometry args={[item.width, item.height, item.depth]} />
         <meshStandardMaterial
           color={blockColor(item.size)}
@@ -221,16 +232,18 @@ function Block({
           the way the plywood one does, and a rotating quad clips into the box.
           The number is the big line whatever the costume — it is what the packing
           actually turns on; the story rides underneath it. */}
-      <Text
-        font={FONT_URL}
-        position={[0, named ? 0.16 : 0, item.depth / 2 + 0.01]}
-        fontSize={Math.min(0.42, item.height * 0.55)}
-        color={ink}
-        anchorX="center"
-        anchorY="middle"
-      >
-        {label.value}
-      </Text>
+      {interactive && (
+        <Text
+          font={FONT_URL}
+          position={[0, named ? 0.16 : 0, item.depth / 2 + 0.01]}
+          fontSize={Math.min(0.42, item.height * 0.55)}
+          color={ink}
+          anchorX="center"
+          anchorY="middle"
+        >
+          {label.value}
+        </Text>
+      )}
       {named && (
         <Text
           font={FONT_URL}
@@ -295,6 +308,8 @@ export interface BoardProps {
   held: Held | null
   /** Bin the held block would land in, if released now. */
   target: number | undefined
+  /** False for a board on display: the whole exhibit is one click target. */
+  interactive?: boolean
   onGrab: (id: string, at: Point3) => void
   onMove: (at: Point3) => void
   onDrop: () => void
@@ -307,6 +322,7 @@ export function Board({
   skin,
   held,
   target,
+  interactive = true,
   onGrab,
   onMove,
   onDrop,
@@ -323,6 +339,7 @@ export function Board({
           placement={placement}
           targeted={target === bin.index}
           skin={skin}
+          labelled={interactive}
         />
       ))}
 
@@ -336,6 +353,7 @@ export function Board({
             position={at}
             held={carried}
             skin={skin}
+            interactive={interactive}
             onGrab={onGrab}
           />
         )
