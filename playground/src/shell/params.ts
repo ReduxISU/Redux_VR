@@ -23,6 +23,10 @@ export interface AppParams {
   skin: string | null
   /** Open a map already lifted into its graph. */
   lift: boolean
+  /** Force the software headset, even where a useless native runtime exists. */
+  emulate: boolean
+  /** Frame the flat view the way a headset would — see `Stage`. */
+  eye: boolean
 
   // Below here: owned by the reduction activity.
   fixtures: boolean
@@ -43,6 +47,8 @@ export function readParams(search: string): AppParams {
     instance: p.get('instance'),
     skin: p.get('skin'),
     lift: p.get('lift') === '1',
+    emulate: p.get('emulate') === '1',
+    eye: p.get('eye') === '1',
     fixtures: p.get('source') === 'fixtures',
     frame: frame === null ? null : Number(frame),
     world: p.get('world') ?? 'both',

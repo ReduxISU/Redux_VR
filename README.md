@@ -100,6 +100,8 @@ tunnel (`shell/tunnel.ts`) — `react-dom`'s `createPortal` cannot cross between
 | `?instance=<string>` | the problem instance, in the backend's own syntax — e.g. `((4,7,3,6,2,8),10,3)`. Lets a printed kit or worksheet carry the exact puzzle a class is working on |
 | `?skin=trucks\|hawaii` | which telling of a puzzle to open in; presentation only, never the puzzle |
 | `?lift=1` | open a colouring map already lifted into its graph |
+| `?emulate=1` | force the bundled software headset past a native runtime that supports nothing |
+| `?eye=1` | render the flat view through the XR stage transform, from the headset's eye point |
 | `?reduction=<className>` | which reduction to show; default `SipserReduceToCliqueStandard` |
 | `?mode=reduction\|gadgets\|solution` | which correspondences to draw; default `reduction` |
 | `?focus=<id>` | pre-select an element, e.g. `?focus=x2_2` — deep-links a specific correspondence |
@@ -158,6 +160,22 @@ pixels.
 local development. Press **Enter VR** (top right); it is disabled with a reason when no runtime is
 available. Entering requires a user gesture, which is why that one button is DOM while every other
 control is scene geometry.
+
+**No headset? There is one built in.** `@pmndrs/xr` bundles IWER and installs a software Quest 3 on
+localhost — no Chrome extension. If the button still says no headset, a native `navigator.xr` that
+supports nothing is in the way (headless Chromium, and some desktop browsers); `?emulate=1` hides it.
+The button then reads *Enter VR (emulated)*, named rather than hidden, because a software session
+proves the scene runs in stereo and says nothing about comfort or legibility.
+
+```bash
+npm run shoot xr-hall -- --xr          # enters a real session; adds ?emulate=1 for you
+npm run shoot eye -- --url='http://localhost:5173/?activity=binpacking&eye=1'
+```
+
+A session renders into the headset's own framebuffer, so a screenshot taken during one is blank.
+`?eye=1` is the way to *look* at headset framing: same stage transform, camera at the eye point,
+headset-like field of view, on a flat screen. Scenes declare a posture — a reduction is a `wall` you
+stand back from, a puzzle board is a `table` you look down into.
 
 **Nothing about the scene changes in a headset.** Only two things differ: the camera comes from the
 headset instead of `OrbitControls`, and the scene is normalised to human scale — one unit is one

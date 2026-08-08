@@ -1,7 +1,7 @@
 import { OrbitControls } from '@react-three/drei'
 import { useXR } from '@react-three/xr'
 import type { ReactNode } from 'react'
-import { type SceneExtent, stageTransform } from '../xr.js'
+import { type SceneExtent, type StagePosture, stageTransform, XR_STAGE } from '../xr.js'
 
 export type { SceneExtent }
 
@@ -16,11 +16,23 @@ export type { SceneExtent }
  * Only the placement differs. The scene itself is identical in both, which is the
  * point: VR is a way of viewing this, not a separate build of it.
  */
-export function Staged({ extent, children }: { extent: SceneExtent; children: ReactNode }) {
+export function Staged({
+  extent,
+  posture = 'wall',
+  force,
+  children,
+}: {
+  extent: SceneExtent
+  /** A diagram to stand back from, or a board to look down into. */
+  posture?: StagePosture
+  /** Apply the headset placement outside a session, for inspection. */
+  force?: boolean
+  children: ReactNode
+}) {
   const session = useXR((s) => s.session)
-  if (!session) return <>{children}</>
+  if (!session && !force) return <>{children}</>
 
-  const { scale, position } = stageTransform(extent)
+  const { scale, position } = stageTransform(extent, XR_STAGE[posture])
   return (
     <group scale={scale} position={position}>
       {children}

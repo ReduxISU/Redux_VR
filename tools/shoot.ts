@@ -5,12 +5,20 @@
  * headless, and portable to CI. Waits on window.__sceneReady, never a timer.
  *
  *   node tools/shoot.ts [name] [--url=...] [--width=1280] [--height=720] [--live]
- *                       [--click=x,y] [--drag=x1,y1,x2,y2] [--await-text="..."] [--fake-xr]
+ *                       [--click=x,y] [--drag=x1,y1,x2,y2] [--await-text="..."]
+ *                       [--xr] [--fake-xr]
  *
  * --click issues a real mouse click at viewport coordinates, which is how the
  * in-scene UI gets exercised: R3F raycasts it exactly as it would a controller ray.
  * --drag does the same for grab-and-place, in steps, so the pointermove handlers
  * that carry an object actually run rather than being skipped by one jump.
+ *
+ * --xr enters a real immersive session. On localhost the XR store installs a
+ * software Quest 3 when no hardware runtime answers, so this exercises stereo
+ * rendering, the stage transform and the controller pointer for real — the one
+ * part of this project a flat screenshot otherwise cannot reach. --fake-xr is a
+ * different thing: it stubs a runtime that *refuses* sessions, to check the
+ * entry button's own states.
  *
  * --click, --drag and --await-text all repeat and run **in the order given**, so
  * a whole session can be scripted against facts rather than timers:
@@ -35,7 +43,13 @@ const width = Number(arg('width', '1280'))
 const height = Number(arg('height', '720'))
 // --live keeps animation running; default freezes it for comparable output.
 const staticFlag = process.argv.includes('--live') ? '' : '?static=1'
-const url = arg('url', `http://localhost:5173/${staticFlag}`)
+let url = arg('url', `http://localhost:5173/${staticFlag}`)
+// --xr needs the software headset, and asking for it is a URL-level decision.
+if (process.argv.includes('--xr')) {
+  const withEmulator = new URL(url)
+  withEmulator.searchParams.set('emulate', '1')
+  url = withEmulator.toString()
+}
 
 const browser = await chromium.launch({
   args: [
@@ -126,6 +140,19 @@ try {
       })
     }
   }
+  if (process.argv.includes('--xr')) {
+    // Through the real button: entering a session needs a user gesture, so the
+    // gesture is the thing under test.
+    await page.waitForFunction(
+      () => !(document.querySelector('.xr-entry button') as HTMLButtonElement)?.disabled,
+      null,
+      { timeout: 30_000 },
+    )
+    await page.click('.xr-entry button')
+    await page.waitForFunction(() => window.__xrSession === true, null, { timeout: 30_000 })
+    await settle()
+  }
+
   // Troika rebuilds <Text> geometry off the main thread, so an in-scene label
   // lands well after the DOM says the state changed — measured at more than 8
   // frames under SwiftShader, and the material colour updates first, so too

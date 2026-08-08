@@ -1,6 +1,6 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { XR } from '@react-three/xr'
-import { type ReactNode, useState } from 'react'
+import { useXR, XR } from '@react-three/xr'
+import { type ReactNode, useEffect, useState } from 'react'
 import { useXRSupport, type XRSupport, xrStore } from '../xr.js'
 import { Hud } from './hud.js'
 
@@ -18,7 +18,18 @@ declare global {
   interface Window {
     __sceneReady?: boolean
     __rendererInfo?: string
+    /** True once an immersive session is running — what `shoot --xr` waits on. */
+    __xrSession?: boolean
   }
+}
+
+/** Publishes session state so the screenshot tool waits on a fact, not a timer. */
+function SessionSignal() {
+  const session = useXR((s) => s.session)
+  useEffect(() => {
+    window.__xrSession = session != null
+  }, [session])
+  return null
 }
 
 /**
@@ -58,6 +69,9 @@ function EnterVR({ support }: { support: XRSupport }) {
   const label = {
     checking: 'checking for WebXR…',
     supported: 'Enter VR',
+    // Named, not hidden: a software headset is worth having and worth not
+    // mistaking for the real thing.
+    emulated: 'Enter VR (emulated)',
     unsupported: 'No VR headset detected',
     insecure: 'WebXR needs HTTPS or localhost',
   }[support]
@@ -75,7 +89,7 @@ function EnterVR({ support }: { support: XRSupport }) {
     <div className="xr-entry">
       <button
         type="button"
-        disabled={support !== 'supported'}
+        disabled={support !== 'supported' && support !== 'emulated'}
         onClick={enter}
         title={
           support === 'unsupported'
@@ -103,6 +117,7 @@ export function SceneShell({ children }: { children: ReactNode }) {
           <directionalLight position={[-6, -3, -5]} intensity={0.35} />
           {children}
           <ReadySignal />
+          <SessionSignal />
         </XR>
       </Canvas>
 

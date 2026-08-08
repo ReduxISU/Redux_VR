@@ -194,7 +194,7 @@ function Puzzle({
 
   return (
     <>
-      <Stage view={view} fov={FOV} damping={!PARAMS.static}>
+      <Stage view={view} fov={FOV} damping={!PARAMS.static} posture="table">
         <Regions
           instance={instance}
           places={places}
