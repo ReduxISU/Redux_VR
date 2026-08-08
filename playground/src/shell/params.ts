@@ -14,6 +14,12 @@ export interface AppParams {
   /** Freeze animation and damping so screenshots are comparable. */
   static: boolean
 
+  /**
+   * A problem instance, in the backend's own string form. Lets a printed kit
+   * or a worksheet carry the exact puzzle a class is working on.
+   */
+  instance: string | null
+
   // Below here: owned by the reduction activity.
   fixtures: boolean
   frame: number | null
@@ -30,6 +36,7 @@ export function readParams(search: string): AppParams {
   return {
     activity: p.get('activity'),
     static: p.get('static') === '1',
+    instance: p.get('instance'),
     fixtures: p.get('source') === 'fixtures',
     frame: frame === null ? null : Number(frame),
     world: p.get('world') ?? 'both',

@@ -21,6 +21,12 @@ export interface ActivityMeta {
 export const DEFAULT_ACTIVITY = 'reduction'
 
 export const ACTIVITIES: Record<string, ActivityMeta> = {
+  binpacking: {
+    id: 'binpacking',
+    title: 'Bin Packing',
+    wing: 'k12',
+    blurb: 'Fit everything in, without overfilling anything',
+  },
   reduction: {
     id: 'reduction',
     title: 'Reductions',

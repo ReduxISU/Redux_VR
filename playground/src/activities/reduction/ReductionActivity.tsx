@@ -24,8 +24,8 @@ import { ControlPanel, panelHeight, panelWidth } from '../../scene/ControlPanel.
 import { Correspondences, type LinkDirection } from '../../scene/Correspondences.js'
 import { FormulaWorld } from '../../scene/FormulaWorld.js'
 import { GraphWorld } from '../../scene/GraphWorld.js'
-import type { SceneExtent } from '../../scene/Staged.js'
 import { FONT_URL } from '../../scene/typography.js'
+import { fitCamera, type V3 } from '../../shell/framing.js'
 import { PARAMS } from '../../shell/params.js'
 import { SceneShell } from '../../shell/SceneShell.js'
 
@@ -103,43 +103,18 @@ function panelCorners(worlds: World[], open: boolean) {
   return [[x - w, y - h, z] as const, [x + w, y + h, z] as const]
 }
 
-function worldSpacePositions(worlds: World[]) {
-  return worlds.flatMap((w) => [
-    ...w.nodes.map(
-      (n) =>
-        [
-          n.position[0] * w.scale + w.origin[0],
-          n.position[1] * w.scale + w.origin[1],
-          n.position[2] * w.scale + w.origin[2],
-        ] as const,
-    ),
+function worldSpacePositions(worlds: World[]): V3[] {
+  return worlds.flatMap<V3>((w) => [
+    ...w.nodes.map<V3>((n) => [
+      n.position[0] * w.scale + w.origin[0],
+      n.position[1] * w.scale + w.origin[1],
+      n.position[2] * w.scale + w.origin[2],
+    ]),
     // Include the caption so framing never clips it.
-    titleAnchor(w) as readonly [number, number, number],
+    titleAnchor(w),
   ])
 }
 
-type V3 = readonly [number, number, number]
-
-const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
-const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-const cross = (a: V3, b: V3): V3 => [
-  a[1] * b[2] - a[2] * b[1],
-  a[2] * b[0] - a[0] * b[2],
-  a[0] * b[1] - a[1] * b[0],
-]
-const unit = (v: V3): V3 => {
-  const l = Math.hypot(v[0], v[1], v[2]) || 1
-  return [v[0] / l, v[1] / l, v[2] / l]
-}
-
-/**
- * Frame the camera to whatever is actually rendered.
- *
- * Fits the bounding *box* in view space rather than a bounding sphere: two worlds
- * side by side form a wide, shallow slab, and a sphere around that is far larger
- * than the content — fitting the sphere leaves everything small. This also uses
- * the viewport aspect, so the horizontal budget is spent rather than wasted.
- */
 function frameCamera(worlds: World[], aspect: number, menuOpen: boolean) {
   // The panel is scene geometry, so framing must account for it or it falls
   // off-screen exactly when a student reaches for it. With the list open it is
@@ -149,39 +124,7 @@ function frameCamera(worlds: World[], aspect: number, menuOpen: boolean) {
   const points = menuOpen
     ? panelCorners(worlds, true)
     : [...worldSpacePositions(worlds), ...panelCorners(worlds, false)]
-  const axis = (i: number) => points.map((p) => p[i] as number)
-  const mid = (v: number[]) => (Math.min(...v) + Math.max(...v)) / 2
-  const center: V3 = [mid(axis(0)), mid(axis(1)), mid(axis(2))]
-
-  const forward = unit(VIEW_DIR)
-  const right = unit(cross([0, 1, 0], forward))
-  const up = cross(forward, right)
-
-  let halfW = 0
-  let halfH = 0
-  let halfD = 0
-  for (const p of points) {
-    const v = sub(p, center)
-    halfW = Math.max(halfW, Math.abs(dot(v, right)))
-    halfH = Math.max(halfH, Math.abs(dot(v, up)))
-    halfD = Math.max(halfD, Math.abs(dot(v, forward)))
-  }
-
-  const tanY = Math.tan((FOV * Math.PI) / 360)
-  const tanX = tanY * aspect
-  const distance =
-    Math.max((halfH * FRAMING_MARGIN) / tanY, (halfW * FRAMING_MARGIN) / tanX, 1) + halfD
-
-  return {
-    center: center as [number, number, number],
-    position: [
-      center[0] + forward[0] * distance,
-      center[1] + forward[1] * distance,
-      center[2] + forward[2] * distance,
-    ] as [number, number, number],
-    // Reused to normalise the scene to human scale inside a headset.
-    extent: { center: center as [number, number, number], width: halfW * 2 } as SceneExtent,
-  }
+  return fitCamera(points, aspect, { fov: FOV, margin: FRAMING_MARGIN, viewDir: VIEW_DIR })
 }
 
 function WorldTitle({ world }: { world: World }) {

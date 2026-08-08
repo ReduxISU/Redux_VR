@@ -9,7 +9,7 @@ export {
   parseInstance,
   sizeOf,
 } from './instance.js'
-export { layoutPuzzle, PUZZLE, restingPositions } from './layout.js'
+export { binAt, layoutPuzzle, PUZZLE, restingPositions } from './layout.js'
 export {
   binLoad,
   binOf,

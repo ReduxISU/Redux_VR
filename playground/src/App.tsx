@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import { BinPackingActivity } from './activities/binpacking/BinPackingActivity.js'
 import { ReductionActivity } from './activities/reduction/ReductionActivity.js'
 import { resolveActivityId } from './shell/activities.js'
 import { PARAMS } from './shell/params.js'
@@ -12,6 +13,7 @@ import { PARAMS } from './shell/params.js'
  */
 
 const VIEWS: Record<string, ComponentType> = {
+  binpacking: BinPackingActivity,
   reduction: ReductionActivity,
 }
 

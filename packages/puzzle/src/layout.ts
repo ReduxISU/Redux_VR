@@ -19,27 +19,46 @@ import type {
 export const PUZZLE = {
   /** World height of one unit of capacity — a capacity-10 bin stands 3.5 tall. */
   unit: 0.35,
-  /** Bins and blocks share a square footprint: in 1-D packing only height means anything. */
+  /** Square footprint: in 1-D packing only height means anything. */
   footprint: 1.6,
+  /**
+   * Blocks are slightly narrower than the containers they go into, so a block
+   * inside one reads as *inside* it rather than coplanar with its walls.
+   * Clearance, exactly as a real mattress needs to slide into a real truck.
+   */
+  blockScale: 0.9,
   binGap: 0.7,
   trayGap: 0.34,
-  /** Depth from the bin row to the first tray row. */
-  trayOffset: 2.6,
+  /**
+   * Depth from the bin row to the first tray row.
+   *
+   * Far enough that a raised camera separates the two on screen instead of
+   * stacking the waiting blocks over the containers they are headed for. The
+   * tallest block clears the shortest container from about 35° up; below that
+   * the tray sits in front of the crates and hides exactly where blocks land.
+   */
+  trayOffset: 4.2,
 } as const
 
-function binRowWidth(count: number): number {
-  return count * PUZZLE.footprint + Math.max(0, count - 1) * PUZZLE.binGap
-}
+/** A classroom instance lays out in one line; only a big one needs a second row. */
+const TRAY_MAX_WIDTH = 12.4
+/**
+ * Rows sit much further apart than columns.
+ *
+ * A raised camera separates them only if the gap beats the block height —
+ * otherwise a tall block in the near row hides whatever waits behind it, which
+ * is worse than a wide tray.
+ */
+const TRAY_ROW_PITCH = PUZZLE.footprint * 2.4
 
 /**
  * Fixed slots, keyed by the item's index rather than its position in a queue.
  * A block pulled out and put back returns to the gap it left, instead of the
  * tray resorting itself under the student's hands.
  */
-function trayGrid(items: ItemBody[], rowWidth: number): Record<string, Vec3> {
+function trayGrid(items: ItemBody[]): Record<string, Vec3> {
   const pitch = PUZZLE.footprint + PUZZLE.trayGap
-  // About as wide as the bins it feeds, so the two read as one arrangement.
-  const cols = Math.max(1, Math.min(items.length, Math.round((rowWidth + PUZZLE.trayGap) / pitch)))
+  const cols = Math.max(1, Math.min(items.length, Math.floor(TRAY_MAX_WIDTH / pitch)))
 
   const slots: Record<string, Vec3> = {}
   items.forEach((item, i) => {
@@ -48,7 +67,7 @@ function trayGrid(items: ItemBody[], rowWidth: number): Record<string, Vec3> {
     slots[item.id] = [
       ((i % cols) - (inRow - 1) / 2) * pitch,
       item.height / 2,
-      PUZZLE.trayOffset + row * pitch,
+      PUZZLE.trayOffset + row * TRAY_ROW_PITCH,
     ]
   })
   return slots
@@ -85,10 +104,11 @@ function boundsOf(bins: BinBody[], items: ItemBody[], tray: Record<string, Vec3>
 }
 
 export function layoutPuzzle(instance: BinPackingInstance): PuzzleLayout {
+  const block = PUZZLE.footprint * PUZZLE.blockScale
   const items: ItemBody[] = itemsOf(instance).map((item) => ({
     ...item,
-    width: PUZZLE.footprint,
-    depth: PUZZLE.footprint,
+    width: block,
+    depth: block,
     height: item.size * PUZZLE.unit,
   }))
 
@@ -102,8 +122,26 @@ export function layoutPuzzle(instance: BinPackingInstance): PuzzleLayout {
     height: instance.capacity * PUZZLE.unit,
   }))
 
-  const tray = trayGrid(items, binRowWidth(instance.binLimit))
+  const tray = trayGrid(items)
   return { bins, items, tray, bounds: boundsOf(bins, items, tray) }
+}
+
+/**
+ * Which bin a block let go at `point` belongs to, ignoring height.
+ *
+ * The catch area is the bin *pitch* rather than its footprint, so the row has
+ * no dead gaps: a block dropped between two containers lands in the nearer one
+ * instead of falling back to the tray. Depth is forgiving in the same spirit
+ * but stops well short of the tray, so putting a block back is unambiguous.
+ */
+export function binAt(layout: PuzzleLayout, point: Vec3): number | undefined {
+  const halfX = (PUZZLE.footprint + PUZZLE.binGap) / 2
+  const halfZ = PUZZLE.footprint
+  return layout.bins.find(
+    (bin) =>
+      Math.abs(point[0] - bin.position[0]) <= halfX &&
+      Math.abs(point[2] - bin.position[2]) <= halfZ,
+  )?.index
 }
 
 /**

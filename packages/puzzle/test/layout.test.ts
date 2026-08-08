@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseInstance } from '../src/instance.js'
-import { layoutPuzzle, PUZZLE, restingPositions } from '../src/layout.js'
+import { binAt, layoutPuzzle, PUZZLE, restingPositions } from '../src/layout.js'
 import { emptyPlacement, place } from '../src/placement.js'
 
 const instance = parseInstance('((4,7,3,6,2,8),10,3)')
@@ -18,9 +18,16 @@ describe('layoutPuzzle', () => {
   it('scales block height to size, and nothing else', () => {
     for (const item of layout.items) {
       expect(item.height).toBeCloseTo(item.size * PUZZLE.unit, 8)
-      // 1-D packing: the other two dimensions carry no information.
-      expect(item.width).toBe(PUZZLE.footprint)
-      expect(item.depth).toBe(PUZZLE.footprint)
+      // 1-D packing: the other two dimensions carry no information, so they are
+      // the same for every block whatever its size.
+      expect(item.width).toBe(layout.items[0]?.width)
+      expect(item.depth).toBe(item.width)
+    }
+  })
+
+  it('makes blocks narrower than the containers, so one sits visibly inside', () => {
+    for (const item of layout.items) {
+      expect(item.width).toBeLessThan(layout.bins[0]?.width as number)
     }
   })
 
@@ -44,14 +51,18 @@ describe('layoutPuzzle', () => {
     }
   })
 
-  it('wraps the tray so it stays about as wide as the bins it feeds', () => {
-    const width = (v: number[]) => Math.max(...v) - Math.min(...v)
-    const slots = Object.values(layout.tray)
-    expect(width(slots.map((s) => s[0]))).toBeLessThan(
-      width(layout.bins.map((b) => b.position[0])) + PUZZLE.footprint * 2,
+  it('lays a classroom-sized instance out in a single line', () => {
+    expect(new Set(Object.values(layout.tray).map((s) => s[2])).size).toBe(1)
+  })
+
+  it('wraps a large instance rather than running off sideways', () => {
+    const big = layoutPuzzle(parseInstance(`((${Array(14).fill(3).join(',')}),10,5)`))
+    const rows = [...new Set(Object.values(big.tray).map((s) => s[2]))].sort((a, b) => a - b)
+    expect(rows.length).toBeGreaterThan(1)
+    // Rows further apart than columns, or a tall block hides the one behind it.
+    expect((rows[1] as number) - (rows[0] as number)).toBeGreaterThan(
+      PUZZLE.footprint + PUZZLE.trayGap,
     )
-    // Six blocks across three columns is two rows.
-    expect(new Set(slots.map((s) => s[2])).size).toBe(2)
   })
 
   it('never overlaps two tray slots', () => {
@@ -131,5 +142,45 @@ describe('restingPositions', () => {
     const p = place(instance, emptyPlacement(instance), 'i2', 1)
     const after = restingPositions(layout, { bins: p.bins.map((b) => b.filter((i) => i !== 'i2')) })
     expect(after.i2).toEqual(before.i2)
+  })
+})
+
+describe('binAt', () => {
+  const centre = (i: number) => layout.bins[i]?.position as [number, number, number]
+
+  it('catches a block let go right over a container', () => {
+    for (const bin of layout.bins) {
+      expect(binAt(layout, [bin.position[0], 9, bin.position[2]])).toBe(bin.index)
+    }
+  })
+
+  it('ignores height, so carry height never matters', () => {
+    const [x, , z] = centre(1)
+    for (const y of [0, 1.2, 50]) expect(binAt(layout, [x, y, z])).toBe(1)
+  })
+
+  it('leaves no dead gap between neighbouring containers', () => {
+    const [x0] = centre(0)
+    const [x1] = centre(1)
+    const between = binAt(layout, [(x0 + x1) / 2, 1.2, 0])
+    expect(between === 0 || between === 1).toBe(true)
+  })
+
+  it('snaps to the nearer container when let go in a gap', () => {
+    const [x0] = centre(0)
+    const [x1] = centre(1)
+    expect(binAt(layout, [x0 + (x1 - x0) * 0.3, 1.2, 0])).toBe(0)
+    expect(binAt(layout, [x0 + (x1 - x0) * 0.7, 1.2, 0])).toBe(1)
+  })
+
+  it('does not claim a block dropped back on the tray', () => {
+    for (const slot of Object.values(layout.tray)) {
+      expect(binAt(layout, [slot[0], 1.2, slot[2]])).toBeUndefined()
+    }
+  })
+
+  it('does not claim a block dropped well past the end of the row', () => {
+    const [xEnd] = centre(2)
+    expect(binAt(layout, [xEnd + PUZZLE.footprint * 3, 1.2, 0])).toBeUndefined()
   })
 })

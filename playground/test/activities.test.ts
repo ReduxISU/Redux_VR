@@ -10,7 +10,7 @@ describe('resolveActivityId', () => {
   })
 
   it('falls back on an unknown id rather than rendering nothing', () => {
-    expect(resolveActivityId('binpacking')).toBe(DEFAULT_ACTIVITY)
+    expect(resolveActivityId('graphcoloring')).toBe(DEFAULT_ACTIVITY)
   })
 
   it('returns every registered id unchanged', () => {
@@ -33,6 +33,7 @@ describe('readParams', () => {
     expect(readParams('')).toEqual({
       activity: null,
       static: false,
+      instance: null,
       fixtures: false,
       frame: null,
       world: 'both',
@@ -41,6 +42,11 @@ describe('readParams', () => {
       menuOpen: false,
       mode: null,
     })
+  })
+
+  it('carries a problem instance verbatim, brackets and all', () => {
+    // What a printed kit or a worksheet QR code would encode.
+    expect(readParams('?instance=((4,7,3,6,2,8),10,3)').instance).toBe('((4,7,3,6,2,8),10,3)')
   })
 
   it('reads the top-level activity split', () => {
