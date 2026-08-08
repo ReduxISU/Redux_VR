@@ -34,8 +34,8 @@ describe('layoutPuzzle', () => {
   it('centres the bin row on the origin and spaces it evenly', () => {
     const xs = layout.bins.map((b) => b.position[0])
     expect(xs.reduce((a, b) => a + b, 0)).toBeCloseTo(0, 8)
-    expect(xs[1] - (xs[0] as number)).toBeCloseTo(PUZZLE.footprint + PUZZLE.binGap, 8)
-    expect(xs[2] - (xs[1] as number)).toBeCloseTo(PUZZLE.footprint + PUZZLE.binGap, 8)
+    expect((xs[1] as number) - (xs[0] as number)).toBeCloseTo(PUZZLE.footprint + PUZZLE.binGap, 8)
+    expect((xs[2] as number) - (xs[1] as number)).toBeCloseTo(PUZZLE.footprint + PUZZLE.binGap, 8)
   })
 
   it('stands the bins on the floor', () => {

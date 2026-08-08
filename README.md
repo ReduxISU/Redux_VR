@@ -7,9 +7,14 @@ The existing D3 views render each problem flat and in isolation. This adds a **t
 spatial scene showing a reduction and the correspondence between its two sides. Flat in the browser
 first; VR is an upgrade on the same scene at the same URL.
 
-**Status:** slice 5 — WebXR entry works. The scene is unchanged in a headset; only its placement and
-the camera source differ. Stereo rendering, controllers and comfort are **not yet verified on real
-hardware** — see below.
+It has since grown a second wing. The front door is a **hall** of problems, each plinth holding a
+working miniature of itself: bin packing you pick up and pack, graph colouring on a map that lifts
+into its graph, and the reduction view as one exhibit among them. Two plinths stand empty on
+purpose — Redux is crowd-sourced, and an unfilled shelf is the ask.
+
+**Status:** an immersive session runs on the bundled software headset, and the stage postures were
+corrected because of what it showed. Stereo depth, comfort, per-eye legibility and whether a child
+can reach a table-staged board are **still unverified on real hardware** — see [WebXR](#webxr).
 
 ![the in-scene reduction menu](docs/menu.png)
 

@@ -11,6 +11,7 @@ import {
   uncolored,
 } from '../src/coloring.js'
 import { COLORING, layoutColoring } from '../src/coloring-layout.js'
+import type { Vec3 } from '../src/types.js'
 
 /** The instance Redux ships for GRAPHCOLORING. */
 const DEFAULT =
@@ -199,7 +200,7 @@ describe('layoutColoring', () => {
     const all = Object.values(layout.positions)
     for (let i = 0; i < all.length; i++) {
       for (let j = i + 1; j < all.length; j++) {
-        const [p, q] = [all[i], all[j]] as [number, number, number][]
+        const [p, q] = [all[i], all[j]] as [Vec3, Vec3]
         expect(Math.hypot(p[0] - q[0], p[2] - q[2])).toBeGreaterThan(COLORING.radius * 2)
       }
     }

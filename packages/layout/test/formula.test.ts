@@ -4,7 +4,7 @@ import gadgets from '../../../fixtures/gadgets.json' with { type: 'json' }
 import meta from '../../../fixtures/meta.json' with { type: 'json' }
 import reduce from '../../../fixtures/reduce.json' with { type: 'json' }
 import sat3Frames from '../../../fixtures/sat3-frames.json' with { type: 'json' }
-import { buildScene, layoutFormula } from '../src/index.js'
+import { buildScene, isFormulaFrame, layoutFormula } from '../src/index.js'
 import type { AnyFrame, ApiReduction, Gadget, ReductionBundle } from '../src/types.js'
 
 const frames = sat3Frames as unknown as AnyFrame[]
@@ -21,7 +21,10 @@ const CLAUSE_COUNT = 3
 const LITERALS_PER_CLAUSE = 3
 
 describe('layoutFormula', () => {
-  const clauses = frames[0]?.clauses ?? []
+  // Narrow through the library's own guard rather than casting: `AnyFrame` is a union, and
+  // reaching for `.clauses` without checking is the mistake the guard exists to prevent.
+  const base = frames[0]
+  const clauses = base && isFormulaFrame(base) ? base.clauses : []
   const { positions, shelves } = layoutFormula(clauses)
 
   it('places every literal exactly once', () => {

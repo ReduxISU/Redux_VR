@@ -1,0 +1,33 @@
+{
+  // One flat program over everything the repo owns: both pure packages, the playground, both test
+  // suites and the tools. Not project references — a referenced project may not disable emit, and
+  // `noEmit` is the whole point for packages that ship raw TypeScript with no build step.
+  //
+  // Flat is also what makes the `declare global { Window.__sceneReady }` in
+  // playground/src/shell/SceneShell.tsx visible to tools/shoot.ts, the file that waits on it.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    // `vite/client` is not under @types so it must be named — and naming any package turns off the
+    // automatic sweep, so `node` (for tools/) comes along explicitly. @types/react and @types/three
+    // are reached by import and need no entry.
+    "types": ["vite/client", "node"],
+    // Redundant with the workspace symlinks, which already resolve through each package's
+    // `exports`. Kept so that a future `main: dist` cannot quietly start type-checking a stale
+    // build instead of the source.
+    "paths": {
+      "@redux-vr/layout": ["./packages/layout/src/index.ts"],
+      "@redux-vr/puzzle": ["./packages/puzzle/src/index.ts"]
+    }
+  },
+  "include": [
+    "packages/*/src",
+    "packages/*/test",
+    "playground/src",
+    "playground/test",
+    "tools",
+    "vitest.config.ts",
+    "playground/vite.config.ts"
+  ],
+  "exclude": ["node_modules", "**/dist"]
+}

@@ -15,6 +15,7 @@
     "build": "npm run build --workspace playground",
     "preview": "npm run preview --workspace playground",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "shoot": "node tools/shoot.ts",
     "lint": "eslint .",
     "format": "biome check --write .",
@@ -23,6 +24,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.7",
     "@eslint/js": "^10.0.1",
+    "@types/node": "^26.2.0",
     "eslint": "^10.8.0",
     "playwright": "^1.62.1",
     "typescript": "~6.0.3",
