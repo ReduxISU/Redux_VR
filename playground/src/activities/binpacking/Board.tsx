@@ -1,4 +1,4 @@
-import { Text } from '@react-three/drei'
+import { Billboard, Text } from '@react-three/drei'
 import { type ThreeEvent, useThree } from '@react-three/fiber'
 import { PALETTE } from '@redux-vr/layout'
 import {
@@ -119,20 +119,31 @@ function Crate({
         <lineBasicMaterial color={color} transparent opacity={targeted || over ? 1 : 0.9} />
       </lineSegments>
 
-      {/* Lying on the floor in front of its crate, like a card on the table.
-          Upright it gets hidden by whatever is waiting in the tray, and
-          billboarded it pivots into the crate it labels. */}
-      <Text
-        font={FONT_URL}
-        position={[bin.position[0], bin.position[1] + 0.01, bin.position[2] + bin.depth / 2 + 0.45]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        fontSize={0.34}
-        color={over ? OVER : '#c6d2e2'}
-        anchorX="center"
-        anchorY="middle"
+      {/* Pinned at the rim and standing in front of the crate.
+          On the floor in front, the tray hides it; on the floor behind, a full
+          crate hides it; riding on top of the stack, an over-full crate carries
+          it off the top of the frame — which is exactly when the number matters
+          most. Fixed at the rim it stays framed, and being nearest the camera it
+          draws over whatever is bursting out behind it. */}
+      <Billboard
+        position={[
+          bin.position[0],
+          bin.position[1] + bin.height + 0.42,
+          bin.position[2] + bin.depth / 2 + 0.35,
+        ]}
       >
-        {`${load}/${instance.capacity}`}
-      </Text>
+        <Text
+          font={FONT_URL}
+          fontSize={0.34}
+          color={over ? OVER : '#c6d2e2'}
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.016}
+          outlineColor="#0b0e12"
+        >
+          {`${load}/${instance.capacity}`}
+        </Text>
+      </Billboard>
     </group>
   )
 }

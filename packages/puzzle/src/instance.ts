@@ -77,3 +77,44 @@ export function encodeCertificate(instance: BinPackingInstance, placement: Place
     .map((bin) => `(${bin.map((id) => sizeOf(instance, id) ?? 0).join(',')})`)
   return bins.length === 0 ? '' : `(${bins.join(',')})`
 }
+
+/**
+ * A solver's answer, laid back out on the board.
+ *
+ * The inverse of `encodeCertificate`, and harder, because a certificate names
+ * sizes while the board moves *items*: two blocks of size 4 are interchangeable
+ * to the verifier but distinct on the table. Each size is matched to some
+ * unused item of that size — any choice is as good as another.
+ *
+ * `undefined` for anything that will not lay out: the empty string a solver
+ * returns when it found nothing, a malformed answer, more bins than the
+ * instance allows, or a size the instance never had. A hint that cannot be
+ * trusted should not be shown.
+ */
+export function decodeCertificate(
+  instance: BinPackingInstance,
+  certificate: string,
+): Placement | undefined {
+  const compact = certificate.replace(/\s+/g, '')
+  if (!/^\((\([^()]*\),?)+\)$/.test(compact)) return undefined
+
+  const groups = compact.slice(1, -1).match(/\(([^()]*)\)/g) ?? []
+  if (groups.length > instance.binLimit) return undefined
+
+  const spare = new Map<number, number[]>()
+  instance.sizes.forEach((size, index) => {
+    spare.set(size, [...(spare.get(size) ?? []), index])
+  })
+
+  const bins: string[][] = Array.from({ length: instance.binLimit }, () => [])
+  for (const [binIndex, group] of groups.entries()) {
+    const body = group.slice(1, -1)
+    if (body === '') continue
+    for (const raw of body.split(',')) {
+      const index = spare.get(Number(raw))?.shift()
+      if (index === undefined) return undefined
+      bins[binIndex]?.push(itemId(index))
+    }
+  }
+  return { bins }
+}

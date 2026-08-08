@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { encodeCertificate, itemsOf, parseInstance } from '../src/instance.js'
+import { decodeCertificate, encodeCertificate, itemsOf, parseInstance } from '../src/instance.js'
 import { emptyPlacement, place } from '../src/placement.js'
 import type { BinPackingInstance } from '../src/types.js'
 
@@ -107,5 +107,58 @@ describe('encodeCertificate', () => {
     const encoded = encodeCertificate(instance, placement)
     const sizes = [...encoded.matchAll(/\d+/g)].map((m) => Number(m[0])).sort((a, b) => a - b)
     expect(sizes).toEqual([...instance.sizes].sort((a, b) => a - b))
+  })
+})
+
+describe('decodeCertificate', () => {
+  const instance: BinPackingInstance = parseInstance(DEFAULT)
+  const sizesIn = (p: { bins: string[][] }) =>
+    p.bins.map((bin) => bin.map((id) => Number(instance.sizes[Number(id.slice(1))])))
+
+  it("lays out FFD's own answer", () => {
+    const laid = decodeCertificate(instance, '((8,2),(7,3),(6,4))')
+    expect(sizesIn(laid as { bins: string[][] })).toEqual([
+      [8, 2],
+      [7, 3],
+      [6, 4],
+    ])
+  })
+
+  it('round-trips whatever the board encodes', () => {
+    const packed = { bins: [['i0', 'i1'], ['i2'], ['i3', 'i4', 'i5']] }
+    const encoded = encodeCertificate(instance, packed)
+    expect(encodeCertificate(instance, decodeCertificate(instance, encoded) as never)).toBe(encoded)
+  })
+
+  it('opens every bin the instance allows, not just the used ones', () => {
+    expect(decodeCertificate(instance, '((8,2))')?.bins).toHaveLength(3)
+  })
+
+  it('uses each block once when sizes repeat', () => {
+    const twins = parseInstance('((5,5),10,1)')
+    const laid = decodeCertificate(twins, '((5,5))')
+    expect(laid?.bins[0]).toEqual(['i0', 'i1'])
+  })
+
+  it('tolerates whitespace', () => {
+    expect(decodeCertificate(instance, ' ( (8, 2) ) ')).toBeDefined()
+  })
+
+  it.each([
+    ['the empty answer a solver gives when it found nothing', ''],
+    ['a size the instance never had', '((9,1))'],
+    ['a size used more often than the instance has it', '((8),(8))'],
+    ['more bins than the instance allows', '((4),(7),(3),(6))'],
+    ['a bare list with no bins', '(8,2)'],
+    ['nested junk', '(((8),2))'],
+    ['unbalanced brackets', '((8,2)'],
+  ])('refuses %s', (_why, bad) => {
+    expect(decodeCertificate(instance, bad)).toBeUndefined()
+  })
+
+  it('never leaves a block in two places at once', () => {
+    const laid = decodeCertificate(instance, '((8,2),(7,3),(6,4))') as { bins: string[][] }
+    const all = laid.bins.flat()
+    expect(new Set(all).size).toBe(all.length)
   })
 })

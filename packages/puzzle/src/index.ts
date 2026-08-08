@@ -2,6 +2,7 @@ export const PUZZLE_VERSION = '0.1.0'
 
 export {
   binId,
+  decodeCertificate,
   encodeCertificate,
   itemId,
   itemIndex,

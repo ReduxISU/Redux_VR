@@ -2,8 +2,9 @@ import {
   type BinPackingInstance,
   binAt,
   binLoad,
+  decodeCertificate,
   emptyPlacement,
-  isComplete,
+  encodeCertificate,
   layoutPuzzle,
   overflowingBins,
   parseInstance,
@@ -11,21 +12,24 @@ import {
   returnToTray,
   trayItems,
 } from '@redux-vr/puzzle'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { solvePacking, verifyPacking } from '../../api/binpacking.js'
 import { type Point3, useDrag } from '../../drag.js'
 import { boxCorners, fitCamera, type V3 } from '../../shell/framing.js'
 import { PARAMS } from '../../shell/params.js'
 import { SceneShell } from '../../shell/SceneShell.js'
 import { Board, LIFT } from './Board.js'
+import { Controls, type Verdict } from './Controls.js'
 
 /**
  * Bin packing you can pick up.
  *
  * The digital twin of the classroom kit: a row of containers with a capacity
- * scale up the side, and numbered blocks waiting in front of them. Nothing here
- * judges the arrangement — an over-full crate turns amber because the student
- * can see it is over-full, not because anything has ruled on it. The verifier
- * is the referee, and it is not wired up yet.
+ * scale up the side, and numbered blocks waiting in front of them.
+ *
+ * Nothing here rules on an arrangement. An over-full crate turns amber because
+ * a student can *see* it is over-full; whether the whole board is a solution is
+ * the backend verifier's call, and the only way to find out is to ask it.
  */
 
 /** The instance Redux itself ships for BINPACKING. */
@@ -51,9 +55,27 @@ const FRAMING_MARGIN = 1.08
  */
 const VIEW_DIR: V3 = [0, 1.05, 1]
 
+/** Half-extents of the control row, so the camera frames it with the board. */
+const CONTROLS = { halfWidth: 3.6, halfHeight: 0.85, lift: 0.85, gap: 1.9 }
+
 function Puzzle({ instance, source }: { instance: BinPackingInstance; source: string }) {
   const layout = useMemo(() => layoutPuzzle(instance), [instance])
   const [placement, setPlacement] = useState(() => emptyPlacement(instance))
+  const [verdict, setVerdict] = useState<Verdict>({ state: 'idle' })
+  const [hinting, setHinting] = useState(false)
+  const [hintNote, setHintNote] = useState<string | null>(null)
+
+  /**
+   * Any answer older than the board it was asked about is thrown away. Moving a
+   * block while a check is in flight would otherwise leave a verdict on screen
+   * that describes an arrangement the student has already changed.
+   */
+  const asked = useRef(0)
+  const forget = useCallback(() => {
+    asked.current += 1
+    setVerdict({ state: 'idle' })
+    setHintNote(null)
+  }, [])
 
   const drop = useCallback(
     (id: string, at: Point3) => {
@@ -61,23 +83,74 @@ function Puzzle({ instance, source }: { instance: BinPackingInstance; source: st
       setPlacement((current) =>
         bin === undefined ? returnToTray(current, id) : place(instance, current, id, bin),
       )
+      forget()
     },
-    [instance, layout],
+    [instance, layout, forget],
   )
 
   const { held, grab, moveTo, release } = useDrag(drop)
   const target = held ? binAt(layout, held.point) : undefined
+  const certificate = encodeCertificate(instance, placement)
+
+  const check = useCallback(async () => {
+    const ticket = (asked.current += 1)
+    setVerdict({ state: 'asking' })
+    try {
+      const fits = await verifyPacking(source, certificate)
+      if (ticket === asked.current) setVerdict({ state: 'answered', fits })
+    } catch (err) {
+      // Never fall back to deciding locally: a guessed verdict is worse than none.
+      if (ticket === asked.current) {
+        setVerdict({ state: 'unreachable', message: (err as Error).message })
+      }
+    }
+  }, [source, certificate])
+
+  const hint = useCallback(async () => {
+    const ticket = (asked.current += 1)
+    setHinting(true)
+    setHintNote(null)
+    setVerdict({ state: 'idle' })
+    try {
+      const answer = await solvePacking(source)
+      const laid = decodeCertificate(instance, answer)
+      if (ticket !== asked.current) return
+      if (laid) setPlacement(laid)
+      else setHintNote('First Fit Decreasing could not pack this one.')
+    } catch (err) {
+      if (ticket === asked.current) setHintNote(`Could not reach Redux — ${(err as Error).message}`)
+    } finally {
+      setHinting(false)
+    }
+  }, [source, instance])
+
+  const reset = useCallback(() => {
+    setPlacement(emptyPlacement(instance))
+    forget()
+  }, [instance, forget])
+
+  const controlAnchor: [number, number, number] = [
+    0,
+    CONTROLS.lift,
+    layout.bounds.max[2] + CONTROLS.gap,
+  ]
 
   const view = useMemo(() => {
-    // Include the carry height, or a lifted block is framed off the top.
+    // Include the carry height and the control row, or a lifted block and the
+    // buttons that judge it both frame off the edges.
     const tallest = Math.max(...layout.items.map((i) => i.height), 0)
     const { min, max } = layout.bounds
     const ceiling: V3 = [max[0], Math.max(max[1], LIFT + tallest), max[2]]
-    return fitCamera(boxCorners(min, ceiling), window.innerWidth / window.innerHeight, {
-      fov: FOV,
-      margin: FRAMING_MARGIN,
-      viewDir: VIEW_DIR,
-    })
+    const controlsZ = max[2] + CONTROLS.gap
+    return fitCamera(
+      [
+        ...boxCorners(min, ceiling),
+        [-CONTROLS.halfWidth, CONTROLS.lift - CONTROLS.halfHeight, controlsZ],
+        [CONTROLS.halfWidth, CONTROLS.lift + CONTROLS.halfHeight, controlsZ],
+      ],
+      window.innerWidth / window.innerHeight,
+      { fov: FOV, margin: FRAMING_MARGIN, viewDir: VIEW_DIR },
+    )
   }, [layout])
 
   const left = trayItems(instance, placement)
@@ -101,6 +174,17 @@ function Puzzle({ instance, source }: { instance: BinPackingInstance; source: st
           onMove={moveTo}
           onDrop={release}
         />
+        <Controls
+          anchor={controlAnchor}
+          verdict={verdict}
+          remaining={left.length}
+          hinting={hinting}
+          hintNote={hintNote}
+          placedAnything={certificate !== ''}
+          onCheck={check}
+          onHint={hint}
+          onReset={reset}
+        />
       </SceneShell>
 
       <div className="hud">
@@ -119,7 +203,22 @@ function Puzzle({ instance, source }: { instance: BinPackingInstance; source: st
         <div className="dim">
           {left.length} to place
           {over.length > 0 ? ` · ${over.length} over capacity` : ''}
-          {isComplete(instance, placement) && over.length === 0 ? ' · everything fits' : ''}
+          {left.length === 0 && over.length === 0 ? ' · ready to check' : ''}
+        </div>
+        {/* What actually goes on the wire. The K-12 view hides this syntax, but
+            it is the same string the web GUI sends, and it makes the referee's
+            answer something a student can be shown rather than told. */}
+        <div className="dim">certificate: {certificate || '(nothing placed)'}</div>
+        {hintNote && <div className="dim">hint: {hintNote}</div>}
+        <div className="dim">
+          referee:{' '}
+          {verdict.state === 'answered'
+            ? verdict.fits
+              ? 'True'
+              : 'False'
+            : verdict.state === 'unreachable'
+              ? `unreachable — ${verdict.message}`
+              : verdict.state}
         </div>
       </div>
     </>

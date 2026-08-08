@@ -11,6 +11,11 @@
  * in-scene UI gets exercised: R3F raycasts it exactly as it would a controller ray.
  * --drag does the same for grab-and-place, in steps, so the pointermove handlers
  * that carry an object actually run rather than being skipped by one jump.
+ *
+ * --click, --drag and --await-text all repeat and run **in the order given**, so
+ * a whole session can be scripted against facts rather than timers:
+ *
+ *   --click=640,610 --await-text='0 to place' --click=460,610 --await-text='True'
  */
 import { mkdir } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
@@ -23,11 +28,6 @@ const SHOTS = resolve(ROOT, 'shots')
 function arg(name: string, fallback: string): string {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`))
   return hit ? hit.slice(name.length + 3) : fallback
-}
-
-/** Repeatable flags, in the order given — several drags make up one arrangement. */
-function args(name: string): string[] {
-  return process.argv.filter((a) => a.startsWith(`--${name}=`)).map((a) => a.slice(name.length + 3))
 }
 
 const name = process.argv[2]?.startsWith('--') ? 'shot' : (process.argv[2] ?? 'shot')
@@ -79,41 +79,47 @@ try {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
   await page.waitForFunction(() => window.__sceneReady === true, null, { timeout: 30_000 })
 
-  const click = arg('click', '')
-  if (click) {
-    const [cx, cy] = click.split(',').map(Number)
-    await page.mouse.click(cx ?? 0, cy ?? 0)
-  }
+  const settle = () =>
+    page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
 
-  for (const drag of args('drag')) {
-    const [x1 = 0, y1 = 0, x2 = 0, y2 = 0] = drag.split(',').map(Number)
-    await page.mouse.move(x1, y1)
-    await page.mouse.down()
-    // Stepped, because the scene tracks the carried object on pointermove; a
-    // single jump would land the drop without ever having moved anything.
-    const steps = 12
-    for (let i = 1; i <= steps; i++) {
-      const t = i / steps
-      await page.mouse.move(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t)
+  // Interaction flags run in the order they were typed, so a session reads as a
+  // script: click, wait for the scene to say it happened, click again. Anything
+  // that waits on a *timer* between steps is a flake waiting to happen.
+  for (const step of process.argv) {
+    if (step.startsWith('--click=')) {
+      const [cx = 0, cy = 0] = step.slice(8).split(',').map(Number)
+      await page.mouse.click(cx, cy)
+      await settle()
+    } else if (step.startsWith('--drag=')) {
+      const [x1 = 0, y1 = 0, x2 = 0, y2 = 0] = step.slice(7).split(',').map(Number)
+      await page.mouse.move(x1, y1)
+      await page.mouse.down()
+      // Stepped, because the scene tracks the carried object on pointermove; a
+      // single jump would land the drop without ever having moved anything.
+      const steps = 12
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps
+        await page.mouse.move(x1 + (x2 - x1) * t, y1 + (y2 - y1) * t)
+      }
+      await page.mouse.up()
+      // Let React commit the drop and the scene repaint before the next grab, or
+      // the following pointerdown reaches for something that has not moved yet.
+      await settle()
+    } else if (step.startsWith('--await-text=')) {
+      const expected = step.slice(13)
+      await page.waitForFunction((t) => document.body.innerText.includes(t), expected, {
+        timeout: 30_000,
+      })
     }
-    await page.mouse.up()
-    // Let React commit the drop and the scene repaint before the next grab, or
-    // the following pointerdown reaches for something that has not moved yet.
-    await page.evaluate(
-      () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
-    )
   }
-
-  const expected = arg('await-text', '')
-  if (expected) {
-    await page.waitForFunction((t) => document.body.innerText.includes(t), expected, {
-      timeout: 30_000,
-    })
-  }
-  // One extra rAF pair so the frame that set the flag is actually presented.
-  await page.evaluate(
-    () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
-  )
+  // Troika rebuilds <Text> geometry off the main thread, so an in-scene label
+  // lands well after the DOM says the state changed — measured at more than 8
+  // frames under SwiftShader, and the material colour updates first, so too
+  // short a wait captures new-coloured *stale* words. This is a heuristic, which
+  // is why assertions belong on the DOM HUD (--await-text) and never on pixels.
+  await page.evaluate(async () => {
+    for (let i = 0; i < 30; i++) await new Promise((r) => requestAnimationFrame(r))
+  })
 
   await mkdir(SHOTS, { recursive: true })
   const out = resolve(SHOTS, `${name}.png`)
