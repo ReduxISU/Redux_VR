@@ -34,6 +34,7 @@ describe('readParams', () => {
       activity: null,
       static: false,
       instance: null,
+      skin: null,
       fixtures: false,
       frame: null,
       world: 'both',

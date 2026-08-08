@@ -15,11 +15,11 @@ import { useEffect, useMemo } from 'react'
 import { BufferAttribute, BufferGeometry } from 'three'
 import type { Held, Point3 } from '../../drag.js'
 import { FONT_URL } from '../../scene/typography.js'
+import { blockLabel, containerLabel, loadLabel, type Skin } from './skins.js'
 
 /** Blocks ride above the tallest container while in hand, so nothing occludes them. */
 export const LIFT = 1.2
 
-const OUTLINE = '#46566b'
 const OVER = PALETTE.ElementHighlight as string
 const TARGET = PALETTE.Solution as string
 
@@ -89,11 +89,13 @@ function Crate({
   instance,
   placement,
   targeted,
+  skin,
 }: {
   bin: BinBody
   instance: BinPackingInstance
   placement: Placement
   targeted: boolean
+  skin: Skin
 }) {
   const edges = useMemo(() => lineGeometry(crateEdges(bin)), [bin])
   const ticks = useMemo(
@@ -103,7 +105,7 @@ function Crate({
 
   const load = binLoad(instance, placement, bin.index)
   const over = load > instance.capacity
-  const color = over ? OVER : targeted ? TARGET : OUTLINE
+  const color = over ? OVER : targeted ? TARGET : skin.accent
 
   return (
     <group>
@@ -134,6 +136,18 @@ function Crate({
       >
         <Text
           font={FONT_URL}
+          position={[0, 0.34, 0]}
+          fontSize={0.2}
+          color={over ? OVER : '#8fa0b6'}
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.014}
+          outlineColor="#0b0e12"
+        >
+          {containerLabel(skin, bin.index)}
+        </Text>
+        <Text
+          font={FONT_URL}
           fontSize={0.34}
           color={over ? OVER : '#c6d2e2'}
           anchorX="center"
@@ -141,22 +155,31 @@ function Crate({
           outlineWidth={0.016}
           outlineColor="#0b0e12"
         >
-          {`${load}/${instance.capacity}`}
+          {loadLabel(skin, load, instance.capacity)}
         </Text>
       </Billboard>
     </group>
   )
 }
 
+/**
+ * Two lines only fit on a block this tall; below it, the number alone.
+ * Kept just under three units (3 × 0.35 lands at 1.0499…) so a three-hour
+ * activity still gets its name.
+ */
+const NAME_MIN_HEIGHT = 1.0
+
 function Block({
   item,
   position,
   held,
+  skin,
   onGrab,
 }: {
   item: ItemBody
   position: Point3
   held: boolean
+  skin: Skin
   onGrab: (id: string, at: Point3) => void
 }) {
   const grab = (e: ThreeEvent<PointerEvent>) => {
@@ -172,6 +195,10 @@ function Block({
   const leave = () => {
     document.body.style.cursor = 'auto'
   }
+
+  const label = blockLabel(skin, item.index, item.size)
+  const named = Boolean(label.name) && item.height >= NAME_MIN_HEIGHT
+  const ink = inkOn(blockColor(item.size))
 
   return (
     <group position={position}>
@@ -191,17 +218,33 @@ function Block({
         />
       </mesh>
       {/* Flat on the face, not billboarded: a numbered block carries its number
-          the way the plywood one does, and a rotating quad clips into the box. */}
+          the way the plywood one does, and a rotating quad clips into the box.
+          The number is the big line whatever the costume — it is what the packing
+          actually turns on; the story rides underneath it. */}
       <Text
         font={FONT_URL}
-        position={[0, 0, item.depth / 2 + 0.01]}
-        fontSize={Math.min(0.42, item.height * 0.62)}
-        color={inkOn(blockColor(item.size))}
+        position={[0, named ? 0.16 : 0, item.depth / 2 + 0.01]}
+        fontSize={Math.min(0.42, item.height * 0.55)}
+        color={ink}
         anchorX="center"
         anchorY="middle"
       >
-        {String(item.size)}
+        {label.value}
       </Text>
+      {named && (
+        <Text
+          font={FONT_URL}
+          position={[0, -0.18, item.depth / 2 + 0.01]}
+          fontSize={0.17}
+          color={ink}
+          fillOpacity={0.75}
+          anchorX="center"
+          anchorY="middle"
+          maxWidth={item.width * 0.92}
+        >
+          {label.name}
+        </Text>
+      )}
     </group>
   )
 }
@@ -248,6 +291,7 @@ export interface BoardProps {
   instance: BinPackingInstance
   layout: PuzzleLayout
   placement: Placement
+  skin: Skin
   held: Held | null
   /** Bin the held block would land in, if released now. */
   target: number | undefined
@@ -260,6 +304,7 @@ export function Board({
   instance,
   layout,
   placement,
+  skin,
   held,
   target,
   onGrab,
@@ -277,13 +322,23 @@ export function Board({
           instance={instance}
           placement={placement}
           targeted={target === bin.index}
+          skin={skin}
         />
       ))}
 
       {layout.items.map((item) => {
         const carried = held?.id === item.id
         const at = carried ? held.point : (resting[item.id] ?? [0, 0, 0])
-        return <Block key={item.id} item={item} position={at} held={carried} onGrab={onGrab} />
+        return (
+          <Block
+            key={item.id}
+            item={item}
+            position={at}
+            held={carried}
+            skin={skin}
+            onGrab={onGrab}
+          />
+        )
       })}
 
       {held && <CarryPlane onMove={onMove} onDrop={onDrop} />}

@@ -19,6 +19,8 @@ export interface AppParams {
    * or a worksheet carry the exact puzzle a class is working on.
    */
   instance: string | null
+  /** Which costume an activity opens in. Presentation only — never the puzzle. */
+  skin: string | null
 
   // Below here: owned by the reduction activity.
   fixtures: boolean
@@ -37,6 +39,7 @@ export function readParams(search: string): AppParams {
     activity: p.get('activity'),
     static: p.get('static') === '1',
     instance: p.get('instance'),
+    skin: p.get('skin'),
     fixtures: p.get('source') === 'fixtures',
     frame: frame === null ? null : Number(frame),
     world: p.get('world') ?? 'both',

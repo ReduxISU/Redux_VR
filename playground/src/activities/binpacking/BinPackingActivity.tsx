@@ -20,6 +20,7 @@ import { PARAMS } from '../../shell/params.js'
 import { SceneShell } from '../../shell/SceneShell.js'
 import { Board, LIFT } from './Board.js'
 import { Controls, type Verdict } from './Controls.js'
+import { containerLabel, loadLabel, nextSkin, resolveSkin } from './skins.js'
 
 /**
  * Bin packing you can pick up.
@@ -56,7 +57,7 @@ const FRAMING_MARGIN = 1.08
 const VIEW_DIR: V3 = [0, 1.05, 1]
 
 /** Half-extents of the control row, so the camera frames it with the board. */
-const CONTROLS = { halfWidth: 3.6, halfHeight: 0.85, lift: 0.85, gap: 1.9 }
+const CONTROLS = { halfWidth: 5.0, halfHeight: 0.85, lift: 0.85, gap: 1.9 }
 
 function Puzzle({ instance, source }: { instance: BinPackingInstance; source: string }) {
   const layout = useMemo(() => layoutPuzzle(instance), [instance])
@@ -64,6 +65,7 @@ function Puzzle({ instance, source }: { instance: BinPackingInstance; source: st
   const [verdict, setVerdict] = useState<Verdict>({ state: 'idle' })
   const [hinting, setHinting] = useState(false)
   const [hintNote, setHintNote] = useState<string | null>(null)
+  const [skin, setSkin] = useState(() => resolveSkin(PARAMS.skin))
 
   /**
    * Any answer older than the board it was asked about is thrown away. Moving a
@@ -129,6 +131,17 @@ function Puzzle({ instance, source }: { instance: BinPackingInstance; source: st
     forget()
   }, [instance, forget])
 
+  /**
+   * Only the words change.
+   *
+   * The placement is deliberately untouched — watching your own arrangement
+   * survive the costume change is the entire lesson. So is the verdict: a
+   * packing Redux has already called correct is *still* correct in the other
+   * telling, because it is the same instance and the same answer. Clearing it
+   * here would teach the opposite of the thing this button exists to teach.
+   */
+  const changeSkin = useCallback(() => setSkin(nextSkin), [])
+
   const controlAnchor: [number, number, number] = [
     0,
     CONTROLS.lift,
@@ -168,6 +181,7 @@ function Puzzle({ instance, source }: { instance: BinPackingInstance; source: st
           instance={instance}
           layout={layout}
           placement={placement}
+          skin={skin}
           held={held}
           target={target}
           onGrab={grab}
@@ -181,9 +195,11 @@ function Puzzle({ instance, source }: { instance: BinPackingInstance; source: st
           hinting={hinting}
           hintNote={hintNote}
           placedAnything={certificate !== ''}
+          nextSkinTitle={nextSkin(skin).short}
           onCheck={check}
           onHint={hint}
           onReset={reset}
+          onSkin={changeSkin}
         />
       </SceneShell>
 
@@ -193,11 +209,15 @@ function Puzzle({ instance, source }: { instance: BinPackingInstance; source: st
         </div>
         <div className="dim">{source}</div>
         <div className="dim">
-          capacity {instance.capacity} · {instance.binLimit} bins
+          costume: {skin.title} · capacity {instance.capacity} {skin.unitName} · {instance.binLimit}{' '}
+          {skin.container.toLowerCase()}s
         </div>
         <div className="dim">
           {placement.bins
-            .map((_, i) => `bin ${i + 1}: ${binLoad(instance, placement, i)}/${instance.capacity}`)
+            .map(
+              (_, i) =>
+                `${containerLabel(skin, i)}: ${loadLabel(skin, binLoad(instance, placement, i), instance.capacity)}`,
+            )
             .join(' · ')}
         </div>
         <div className="dim">

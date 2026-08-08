@@ -26,9 +26,12 @@ export interface ControlsProps {
   hinting: boolean
   hintNote: string | null
   placedAnything: boolean
+  /** Title of the costume this button switches *to*. */
+  nextSkinTitle: string
   onCheck: () => void
   onHint: () => void
   onReset: () => void
+  onSkin: () => void
 }
 
 function headline(verdict: Verdict, remaining: number, hintNote: string | null) {
@@ -59,12 +62,16 @@ export function Controls({
   hinting,
   hintNote,
   placedAnything,
+  nextSkinTitle,
   onCheck,
   onHint,
   onReset,
+  onSkin,
 }: ControlsProps) {
   const pitch = BUTTON.width + BUTTON.gap
   const line = headline(verdict, remaining, hintNote)
+  /** Four across, centred: -1.5, -0.5, +0.5, +1.5 of the pitch. */
+  const at = (slot: number) => (slot - 1.5) * pitch
 
   return (
     <Billboard position={anchor}>
@@ -83,7 +90,7 @@ export function Controls({
       </Text>
 
       <Button3D
-        position={[-pitch, 0, 0]}
+        position={[at(0), 0, 0]}
         width={BUTTON.width}
         height={BUTTON.height}
         label="Check it"
@@ -92,7 +99,7 @@ export function Controls({
         onSelect={onCheck}
       />
       <Button3D
-        position={[0, 0, 0]}
+        position={[at(1), 0, 0]}
         width={BUTTON.width}
         height={BUTTON.height}
         label={hinting ? 'thinking…' : 'Show me'}
@@ -101,7 +108,15 @@ export function Controls({
         onSelect={onHint}
       />
       <Button3D
-        position={[pitch, 0, 0]}
+        position={[at(2), 0, 0]}
+        width={BUTTON.width}
+        height={BUTTON.height}
+        label={nextSkinTitle}
+        detail="same puzzle, new story"
+        onSelect={onSkin}
+      />
+      <Button3D
+        position={[at(3), 0, 0]}
         width={BUTTON.width}
         height={BUTTON.height}
         label="Start over"
